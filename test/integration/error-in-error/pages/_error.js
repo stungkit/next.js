@@ -1,13 +1,15 @@
 import React from 'react'
 
 class Error extends React.Component {
-  static async getInitialProps ({ res, err }) {
-    await Promise.reject(new Error('an error in error'))
+  static async getInitialProps({ req, res, err }) {
+    if (!req.url.startsWith('/404') && !req.url.startsWith('/500')) {
+      await Promise.reject(new Error('an error in error'))
+    }
     const statusCode = res ? res.statusCode : err ? err.statusCode : null
     return { statusCode }
   }
 
-  render () {
+  render() {
     return (
       <p>
         {this.props.statusCode

@@ -1,28 +1,30 @@
 import crypto from 'crypto'
 import Document, { Html, Head, Main, NextScript } from 'next/document'
 
-const cspHashOf = text => {
+const cspHashOf = (text) => {
   const hash = crypto.createHash('sha256')
   hash.update(text)
   return `'sha256-${hash.digest('base64')}'`
 }
 
 export default class MyDocument extends Document {
-  static async getInitialProps (ctx) {
+  static async getInitialProps(ctx) {
     let options
 
-    const enhanceComponent = Component => props => (
-      <div>
-        <span id='render-page-enhance-component'>RENDERED</span>
-        <Component {...props} />
-      </div>
-    )
-    const enhanceApp = Component => props => (
-      <div>
-        <span id='render-page-enhance-app'>RENDERED</span>
-        <Component {...props} />
-      </div>
-    )
+    const enhanceComponent = (Component) => (props) =>
+      (
+        <div>
+          <span id="render-page-enhance-component">RENDERED</span>
+          <Component {...props} />
+        </div>
+      )
+    const enhanceApp = (Component) => (props) =>
+      (
+        <div>
+          <span id="render-page-enhance-app">RENDERED</span>
+          <Component {...props} />
+        </div>
+      )
 
     if (ctx.query.withEnhancer) {
       options = enhanceComponent
@@ -36,17 +38,19 @@ export default class MyDocument extends Document {
       }
     }
 
-    const result = ctx.renderPage(options)
+    const result = await ctx.renderPage(options)
 
     return {
       ...result,
+      cssInJsCount: (result.html.match(/css-in-js-class/g) || []).length,
       customProperty: 'Hello Document',
-      withCSP: ctx.query.withCSP
+      withCSP: ctx.query.withCSP,
     }
   }
 
-  render () {
+  render() {
     let csp
+    // eslint-disable-next-line default-case
     switch (this.props.withCSP) {
       case 'hash':
         csp = `default-src 'self'; script-src 'self' ${cspHashOf(
@@ -59,18 +63,19 @@ export default class MyDocument extends Document {
     }
 
     return (
-      <Html className='test-html-props'>
-        <Head nonce='test-nonce'>
+      <Html className="test-html-props">
+        <Head nonce="test-nonce">
           {csp ? (
-            <meta httpEquiv='Content-Security-Policy' content={csp} />
+            <meta httpEquiv="Content-Security-Policy" content={csp} />
           ) : null}
           <style>{`body { margin: 0 } /* custom! */`}</style>
         </Head>
-        <body className='custom_class'>
-          <p id='custom-property'>{this.props.customProperty}</p>
-          <p id='document-hmr'>Hello Document HMR</p>
+        <body className="custom_class">
+          <p id="custom-property">{this.props.customProperty}</p>
+          <p id="document-hmr">Hello Document HMR</p>
           <Main />
-          <NextScript nonce='test-nonce' />
+          <NextScript nonce="test-nonce" />
+          <div id="css-in-cjs-count">{this.props.cssInJsCount}</div>
         </body>
       </Html>
     )

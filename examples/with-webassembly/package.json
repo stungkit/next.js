@@ -1,13 +1,20 @@
 {
+  "private": true,
+  "scripts": {
+    "dev": "next",
+    "build": "next build",
+    "build-rust": "rustc --target wasm32-unknown-unknown -O --crate-type=cdylib src/add.rs -o add.wasm",
+    "start": "next start"
+  },
   "dependencies": {
     "next": "latest",
-    "react": "^16.7.0",
-    "react-dom": "^16.7.0"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
-  "scripts": {
-    "dev": "node server.js",
-    "build": "next build",
-    "build-rust": "rustc +nightly --target wasm32-unknown-unknown -O --crate-type=cdylib src/add.rs -o add.wasm",
-    "start": "NODE_ENV=production node server.js"
+  "devDependencies": {
+    "@types/node": "^18.11.10",
+    "@types/react": "^18.0.26",
+    "@types/react-dom": "^18.0.9",
+    "typescript": "^4.9.3"
   }
 }

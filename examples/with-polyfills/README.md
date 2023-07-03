@@ -1,45 +1,31 @@
-# Example app with polyfills
+# With Polyfills
+
+Next.js supports IE11 and all modern browsers (Edge, Firefox, Chrome, Safari, Opera, et al) with no required configuration. It also adds [some polyfills](https://nextjs.org/docs/basic-features/supported-browsers-features#polyfills) by default.
+
+If your own code or any external npm dependencies require features not supported by your target browsers, you need to add polyfills yourself.
+
+In this case, you should add a top-level import for the specific polyfill you need in your Custom `<App>` or the individual component.
+
+## Deploy your own
+
+Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=next-example) or preview live with [StackBlitz](https://stackblitz.com/github/vercel/next.js/tree/canary/examples/with-polyfills)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel/next.js/tree/canary/examples/with-polyfills&project-name=with-polyfills&repository-name=with-polyfills)
 
 ## How to use
 
-### Using `create-next-app`
-
-Execute [`create-next-app`](https://github.com/zeit/next.js/tree/canary/packages/create-next-app) with [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/) or [npx](https://github.com/zkat/npx#readme) to bootstrap the example:
+Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [npm](https://docs.npmjs.com/cli/init), [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/), or [pnpm](https://pnpm.io) to bootstrap the example:
 
 ```bash
 npx create-next-app --example with-polyfills with-polyfills-app
-# or
+```
+
+```bash
 yarn create next-app --example with-polyfills with-polyfills-app
 ```
 
-### Download manually
-
-Download the example:
-
 ```bash
-curl https://codeload.github.com/zeit/next.js/tar.gz/master | tar -xz --strip=2 next.js-master/examples/with-polyfills
-cd with-polyfills
+pnpm create next-app --example with-polyfills with-polyfills-app
 ```
 
-Install it and run:
-
-```bash
-npm install
-npm run dev
-# or
-yarn
-yarn dev
-```
-
-Deploy it to the cloud with [now](https://zeit.co/now) ([download](https://zeit.co/download))
-
-```bash
-now
-```
-
-## The idea behind the example
-
-Next.js supports browsers from IE10 to the latest. It adds polyfills as they need. But Next.js cannot add polyfills for code inside NPM modules.
-So sometimes, you need to add polyfills by yourself.
-
-This how you can do it easily with Next.js's custom webpack config feature.
+Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=next-example) ([Documentation](https://nextjs.org/docs/deployment)).

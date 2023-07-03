@@ -1,18 +1,12 @@
 {
-  "name": "with-docker",
-  "version": "1.0.0",
+  "private": true,
   "scripts": {
-    "dev": "next",
-    "build": "next build",
-    "start": "next start"
+    "dev": "next dev",
+    "build": "next build"
   },
   "dependencies": {
     "next": "latest",
-    "react": "^16.7.0",
-    "react-dom": "^16.7.0"
-  },
-  "devDependencies": {
-    "isomorphic-unfetch": "^3.0.0"
-  },
-  "license": "ISC"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
 }

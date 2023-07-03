@@ -6,7 +6,7 @@ The webpack function in `next.config.js` returned a promise which is not support
 
 ```js
 module.exports = {
-  webpack: async function(config) {
+  webpack: async function (config) {
     return config
   },
 }
@@ -14,6 +14,8 @@ module.exports = {
 
 #### Possible Ways to Fix It
 
-Check your `next.config.js` for `async` or `return Promise`
+In Next.js versions above `12.0.10`, `module.exports = async () =>` is supported.
+
+For older versions, you can check your `next.config.js` for `async` or `return Promise`.
 
 Potentially a plugin is returning a `Promise` from the webpack function.

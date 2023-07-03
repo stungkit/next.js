@@ -7,6 +7,17 @@ export default class MyApp extends App {}
 /*
   Method is experimental and will eventually be handled in a Next.js plugin
 */
-export function unstable_onPerformanceData (data) {
-  localStorage.setItem(data.name, data.value || data.startTime)
+
+export function reportWebVitals(data) {
+  const name = data.name || data.entryType
+  localStorage.setItem(
+    name,
+    data.value !== undefined ? data.value : data.startTime
+  )
+  const countMap = window.__BEACONS_COUNT
+  countMap.set(name, (countMap.get(name) || 0) + 1)
+
+  if (data.attribution) {
+    ;(window.__metricsWithAttribution ??= []).push(data)
+  }
 }

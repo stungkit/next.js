@@ -1,18 +1,18 @@
 {
-  "name": "with-emotion",
-  "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "next",
     "build": "next build",
     "start": "next start"
   },
-  "dependencies": {
-    "@emotion/core": "^10.0.0",
-    "@emotion/styled": "^10.0.0",
-    "babel-plugin-emotion": "^10.0.0",
-    "next": "latest",
-    "react": "^16.7.0",
-    "react-dom": "^16.7.0"
+  "devDependencies": {
+    "@emotion/babel-plugin": "11.10.2"
   },
-  "license": "ISC"
+  "dependencies": {
+    "@emotion/react": "11.10.4",
+    "@emotion/styled": "11.10.4",
+    "next": "latest",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
 }

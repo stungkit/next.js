@@ -1,26 +1,24 @@
 /* eslint-env jest */
-/* global jasmine */
+
 import { join } from 'path'
 import getPort from 'get-port'
-import { fetchViaHTTP, initNextServerScript, killApp } from 'next-test-utils'
-import clone from 'clone'
+import {
+  fetchViaHTTP,
+  initNextServerScript,
+  killApp,
+  getPageFileFromBuildManifest,
+} from 'next-test-utils'
 
 const appDir = join(__dirname, '../')
 let appPort
 let server
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 2
 
 const context = {}
 
 const startServer = async (optEnv = {}) => {
   const scriptPath = join(appDir, 'server.js')
   context.appPort = appPort = await getPort()
-  const env = Object.assign(
-    {},
-    clone(process.env),
-    { PORT: `${appPort}` },
-    optEnv
-  )
+  const env = Object.assign({ ...process.env }, { PORT: `${appPort}` }, optEnv)
 
   server = await initNextServerScript(scriptPath, /ready on/i, env)
 }
@@ -47,11 +45,20 @@ describe('FileSystemPublicRoutes', () => {
 
   it('should still handle /_next routes', async () => {
     await fetch('/exportpathmap-route') // make sure it's built
-    const res = await fetch(
-      '/_next/static/development/pages/exportpathmap-route.js'
+    const pageFile = getPageFileFromBuildManifest(
+      appDir,
+      '/exportpathmap-route'
     )
+    const res = await fetch(join('/_next', pageFile))
     expect(res.status).toBe(200)
     const body = await res.text()
     expect(body).toMatch(/exportpathmap was here/)
+  })
+
+  it('should route to public folder files', async () => {
+    const res = await fetch('/hello.txt')
+    expect(res.status).toBe(200)
+    const body = await res.text()
+    expect(body).toMatch(/hello/)
   })
 })

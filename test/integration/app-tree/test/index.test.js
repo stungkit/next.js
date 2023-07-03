@@ -1,7 +1,6 @@
 /* eslint-env jest */
-/* global jasmine */
+
 import path from 'path'
-import fs from 'fs-extra'
 import webdriver from 'next-webdriver'
 import {
   nextBuild,
@@ -11,13 +10,9 @@ import {
   killApp,
   renderViaHTTP,
   waitFor,
-  killAll
 } from 'next-test-utils'
 
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 1
-
 const appDir = path.join(__dirname, '..')
-const nextConfig = path.join(appDir, 'next.config.js')
 let appPort
 let app
 
@@ -68,24 +63,7 @@ describe('AppTree', () => {
       appPort = await findPort()
       app = await nextStart(appDir, appPort)
     })
-    afterAll(() => killAll(app))
-    runTests()
-  })
-
-  describe('serverless mode', () => {
-    beforeAll(async () => {
-      await fs.writeFile(
-        nextConfig,
-        `module.exports = { target: 'serverless' }`
-      )
-      await nextBuild(appDir)
-      appPort = await findPort()
-      app = await nextStart(appDir, appPort)
-    })
-    afterAll(async () => {
-      await killApp(app)
-      await fs.remove(nextConfig)
-    })
+    afterAll(() => killApp(app))
     runTests()
   })
 })

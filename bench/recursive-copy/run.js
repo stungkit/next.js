@@ -1,30 +1,26 @@
-const { join } = require('path')
-const fs = require('fs-extra')
-
-const recursiveCopyNpm = require('recursive-copy')
-
-const {
-  recursiveCopy: recursiveCopyCustom
-} = require('next/dist/lib/recursive-copy')
+import { join } from 'path'
+import { ensureDir, outputFile, remove } from 'fs-extra'
+import recursiveCopyNpm from 'recursive-copy'
+import { recursiveCopy as recursiveCopyCustom } from 'next/dist/lib/recursive-copy'
 
 const fixturesDir = join(__dirname, 'fixtures')
 const srcDir = join(fixturesDir, 'src')
 const destDir = join(fixturesDir, 'dest')
 
 const createSrcFolder = async () => {
-  await fs.ensureDir(srcDir)
+  await ensureDir(srcDir)
 
   const files = new Array(100)
     .fill(undefined)
-    .map((x, i) =>
+    .map((_, i) =>
       join(srcDir, `folder${i % 5}`, `folder${i + (1 % 5)}`, `file${i}`)
     )
 
-  await Promise.all(files.map(file => fs.outputFile(file, 'hello')))
+  await Promise.all(files.map((file) => outputFile(file, 'hello')))
 }
 
-async function run (fn) {
-  async function test () {
+async function run(fn) {
+  async function test() {
     const start = process.hrtime()
 
     await fn(srcDir, destDir)
@@ -38,7 +34,7 @@ async function run (fn) {
 
   for (let i = 0; i < 10; i++) {
     const t = await test()
-    await fs.remove(destDir)
+    await remove(destDir)
     ts.push(t)
   }
 
@@ -48,7 +44,7 @@ async function run (fn) {
   console.log({ sum, nb, avg })
 }
 
-async function main () {
+async function main() {
   await createSrcFolder()
 
   console.log('test recursive-copy npm module')
@@ -57,7 +53,7 @@ async function main () {
   console.log('test recursive-copy custom implementation')
   await run(recursiveCopyCustom)
 
-  await fs.remove(fixturesDir)
+  await remove(fixturesDir)
 }
 
 main()

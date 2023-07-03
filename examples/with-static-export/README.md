@@ -1,41 +1,29 @@
-# Static export example
+# Next.js Static Export
+
+Next.js enables starting as a static site or Single-Page Application (SPA), then later optionally upgrading to use features that require a server.
+
+When running `next build`, Next.js generates an HTML file per route. By breaking a strict SPA into individual HTML files, Next.js can avoid loading unnecessary JavaScript code on the client-side, reducing the bundle size and enabling faster page loads.
+
+Learn more: https://nextjs.org/docs/app/building-your-application/deploying/static-exports
+
+## Deploy your own
+
+Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=next-example) or preview live with [StackBlitz](https://stackblitz.com/github/vercel/next.js/tree/canary/examples/with-static-export)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel/next.js/tree/canary/examples/with-static-export)
 
 ## How to use
 
-### Using `create-next-app`
-
-Execute [`create-next-app`](https://github.com/zeit/next.js/tree/canary/packages/create-next-app) with [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/) or [npx](https://github.com/zkat/npx#readme) to bootstrap the example:
+Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [npm](https://docs.npmjs.com/cli/init), [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/), or [pnpm](https://pnpm.io) to bootstrap the example:
 
 ```bash
 npx create-next-app --example with-static-export with-static-export-app
-# or
+```
+
+```bash
 yarn create next-app --example with-static-export with-static-export-app
 ```
 
-### Download manually
-
-Download the example:
-
 ```bash
-curl https://codeload.github.com/zeit/next.js/tar.gz/canary | tar -xz --strip=2 next.js-canary/examples/with-static-export
-cd with-static-export
+pnpm create next-app --example with-static-export with-static-export-app
 ```
-
-> This example requires [Node.js 8](https://nodejs.org/en/download/current/) or a later version.<br>
-> (That's for the use of "async await" in the `next.config.js`.)
-
-Install it and run:
-
-```bash
-npm install
-npm run dev
-# or
-yarn
-yarn dev
-```
-
-## The idea behind the example
-
-This example show how to export to static HTML files your Next.js application fetching data from an API to generate a dynamic list of pages.
-
-When trying to run `npm start` it will build and export your pages into the `out` folder and serve them on `localhost:5000`.

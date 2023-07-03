@@ -1,42 +1,27 @@
 # Example app with analytics
 
+This example shows how to use Next.js along with [Segment Analytics](https://segment.com). A [custom app](https://nextjs.org/docs/advanced-features/custom-app) is used to inject the [Segment Analytics.js snippet](https://github.com/segmentio/snippet). The server and client-side call the [Page API](https://segment.com/docs/connections/spec/page/), while components call the [Track API](https://segment.com/docs/connections/spec/track/) on user actions (Refer to [`contact.js`](https://github.com/vercel/next.js/blob/canary/examples/with-segment-analytics/pages/contact.js)).
+
+## Deploy your own
+
+Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=next-example) or preview live with [StackBlitz](https://stackblitz.com/github/vercel/next.js/tree/canary/examples/with-segment-analytics)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel/next.js/tree/canary/examples/with-segment-analytics&project-name=with-segment-analytics&repository-name=with-segment-analytics)
+
 ## How to use
 
-### Using `create-next-app`
-
-Execute [`create-next-app`](https://github.com/zeit/next.js/tree/canary/packages/create-next-app) with [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/) or [npx](https://github.com/zkat/npx#readme) to bootstrap the example:
+Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [npm](https://docs.npmjs.com/cli/init), [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/), or [pnpm](https://pnpm.io) to bootstrap the example:
 
 ```bash
 npx create-next-app --example with-segment-analytics with-segment-analytics-app
-# or
+```
+
+```bash
 yarn create next-app --example with-segment-analytics with-segment-analytics-app
 ```
 
-### Download manually
-
-Download the example:
-
 ```bash
-curl https://codeload.github.com/zeit/next.js/tar.gz/canary | tar -xz --strip=2 next.js-canary/examples/with-segment-analytics
-cd with-segment-analytics
+pnpm create next-app --example with-segment-analytics with-segment-analytics-app
 ```
 
-Install it and run:
-
-```bash
-npm install
-npm run dev
-# or
-yarn
-yarn dev
-```
-
-Deploy it to the cloud with [now](https://zeit.co/now) ([download](https://zeit.co/download))
-
-```bash
-now
-```
-
-## The idea behind the example
-
-This example shows how to use Next.js along with [Segment Analytics](https://segment.com). A custom document is used in inject the [Segment snippet](https://github.com/segmentio/snippet) into the `<head>`. Page views are tracked on both the server and client side and components fire ["track"](https://segment.com/docs/spec/track/) events based on user actions (see `contact.js` for example).
+Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=next-example) ([Documentation](https://nextjs.org/docs/deployment)).

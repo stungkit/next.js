@@ -12,31 +12,36 @@ const thumbnailVariants = {
   exit: {
     scale: 0.5,
     opacity: 0,
-    transition: { duration: 1.5, ...transition }
-  }
+    transition: { duration: 1.5, ...transition },
+  },
 }
 
 const frameVariants = {
-  hover: { scale: 0.95 }
+  hover: { scale: 0.95 },
 }
 
 const imageVariants = {
-  hover: { scale: 1.1 }
+  hover: { scale: 1.1 },
 }
 
 const Thumbnail = ({ id, i }) => (
   <>
-    <motion.div className='thumbnail' variants={thumbnailVariants}>
+    <motion.div className="thumbnail" variants={thumbnailVariants}>
       <motion.div
-        className='frame'
-        whileHover='hover'
+        className="frame"
+        whileHover="hover"
         variants={frameVariants}
         transition={transition}
       >
-        <Link href='/image/[id]' as={`/image/${i}`} scroll={false}>
+        <Link
+          href="/image/[index]"
+          as={`/image/${i}`}
+          scroll={false}
+          legacyBehavior
+        >
           <motion.img
-            src={`https://static1.squarespace.com/static/5b475b2c50a54f54f9b4e1dc/t/${id}.jpg?format=1500w`}
-            alt='The Barbican'
+            src={`https://images.unsplash.com/${id}?auto=format&fit=crop&w=1500`}
+            alt="The Barbican"
             variants={imageVariants}
             transition={transition}
           />
@@ -69,13 +74,13 @@ const Thumbnail = ({ id, i }) => (
 
 const Gallery = () => (
   <>
-    <h1>Barbican</h1>
-    <div className='gallery'>
+    <h1>Motion</h1>
+    <div className="gallery">
       <motion.div
-        className='thumbnails'
-        initial='initial'
-        animate='enter'
-        exit='exit'
+        className="thumbnails"
+        initial="initial"
+        animate="enter"
+        exit="exit"
         variants={{ exit: { transition: { staggerChildren: 0.1 } } }}
       >
         {images.map((id, i) => (
@@ -118,14 +123,14 @@ const Gallery = () => (
              bottom: -130px;
            }
          }
-         
+
          @media screen and (min-width: 800px) {
            h1 {
              font-size: 180px;
              bottom: -170px;
            }
          }
-         
+
          @media screen and (min-width: 1000px) {
            h1 {
              font-size: 220px;

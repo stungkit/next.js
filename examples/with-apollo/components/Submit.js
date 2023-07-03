@@ -1,6 +1,4 @@
-import { useMutation } from '@apollo/react-hooks'
-import gql from 'graphql-tag'
-import { ALL_POSTS_QUERY, allPostsQueryVars } from './PostList'
+import { gql, useMutation } from '@apollo/client'
 
 const CREATE_POST_MUTATION = gql`
   mutation createPost($title: String!, $url: String!) {
@@ -14,10 +12,10 @@ const CREATE_POST_MUTATION = gql`
   }
 `
 
-export default function Submit () {
+export default function Submit() {
   const [createPost, { loading }] = useMutation(CREATE_POST_MUTATION)
 
-  const handleSubmit = event => {
+  const handleSubmit = (event) => {
     event.preventDefault()
     const form = event.target
     const formData = new window.FormData(form)
@@ -27,30 +25,33 @@ export default function Submit () {
 
     createPost({
       variables: { title, url },
-      update: (proxy, { data: { createPost } }) => {
-        const data = proxy.readQuery({
-          query: ALL_POSTS_QUERY,
-          variables: allPostsQueryVars
-        })
-        // Update the cache with the new post at the top of the
-        proxy.writeQuery({
-          query: ALL_POSTS_QUERY,
-          data: {
-            ...data,
-            allPosts: [createPost, ...data.allPosts]
+      update: (cache, { data: { createPost } }) => {
+        cache.modify({
+          fields: {
+            allPosts(existingPosts = []) {
+              const newPostRef = cache.writeFragment({
+                data: createPost,
+                fragment: gql`
+                  fragment NewPost on allPosts {
+                    id
+                    type
+                  }
+                `,
+              })
+              return [newPostRef, ...existingPosts]
+            },
           },
-          variables: allPostsQueryVars
         })
-      }
+      },
     })
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <h1>Submit</h1>
-      <input placeholder='title' name='title' type='text' required />
-      <input placeholder='url' name='url' type='url' required />
-      <button type='submit' disabled={loading}>
+      <input placeholder="title" name="title" type="text" required />
+      <input placeholder="url" name="url" type="url" required />
+      <button type="submit" disabled={loading}>
         Submit
       </button>
       <style jsx>{`

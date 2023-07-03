@@ -1,5 +1,5 @@
 /* eslint-env jest */
-/* global jasmine */
+
 import webdriver from 'next-webdriver'
 import path from 'path'
 import {
@@ -8,10 +8,9 @@ import {
   findPort,
   killApp,
   launchApp,
-  waitFor
+  check,
 } from 'next-test-utils'
 
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 1
 const appDir = path.join(__dirname, '..')
 let appPort
 let app
@@ -35,21 +34,21 @@ const runTests = () => {
 
   it('Refreshes query on mount', async () => {
     const browser = await webdriver(appPort, '/post-1')
+    await check(() => browser.eval('document.body.innerHTML'), /post.*post-1/)
     const html = await browser.eval('document.body.innerHTML')
-    expect(html).toMatch(/post.*post-1/)
     expect(html).toMatch(/nextExport/)
   })
 
   it('should update asPath after mount', async () => {
     const browser = await webdriver(appPort, '/zeit/cmnt-2')
-    await waitFor(500)
-    const html = await browser.eval(`document.documentElement.innerHTML`)
-    expect(html).toMatch(/\/zeit\/cmnt-2/)
+    await check(
+      () => browser.eval(`document.documentElement.innerHTML`),
+      /\/zeit\/cmnt-2/
+    )
   })
 
   it('should not replace URL with page name while asPath is delayed', async () => {
     const browser = await webdriver(appPort, '/zeit/cmnt-1')
-    await waitFor(500)
     const val = await browser.eval(`!!window.pathnames.find(function(p) {
       return p !== '/zeit/cmnt-1'
     })`)
@@ -84,10 +83,20 @@ describe('Auto Export', () => {
 
     it('should not show hydration warning from mismatching asPath', async () => {
       const browser = await webdriver(appPort, '/zeit/cmnt-1')
-      await waitFor(500)
+      const caughtWarns = await browser.eval(`window.caughtWarns`)
+      expect(caughtWarns).toEqual([])
+    })
 
-      const numCaught = await browser.eval(`window.caughtWarns.length`)
-      expect(numCaught).toBe(0)
+    it('should include error link when hydration error does occur', async () => {
+      const browser = await webdriver(appPort, '/post-1/hydrate-error')
+      const logs = await browser.log()
+      expect(
+        logs.some((log) =>
+          log.message.includes(
+            'See more info here: https://nextjs.org/docs/messages/react-hydration-error'
+          )
+        )
+      ).toBe(true)
     })
   })
 })

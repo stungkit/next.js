@@ -1,10 +1,11 @@
-const { join } = require('path')
-const { promisify } = require('util')
-const rimrafMod = require('rimraf')
-const resolveDataDir = join(__dirname, `fixtures-${process.argv[2]}`, '**/*')
-const rimraf = promisify(rimrafMod)
+import { join } from 'path'
+import { promisify } from 'util'
+import rimrafMod from 'rimraf'
 
-async function test () {
+const rimraf = promisify(rimrafMod)
+const resolveDataDir = join(__dirname, `fixtures-${process.argv[2]}`, '**/*')
+
+async function test() {
   const time = process.hrtime()
   await rimraf(resolveDataDir)
 

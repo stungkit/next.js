@@ -1,25 +1,24 @@
 /* eslint-env jest */
-/* global jasmine */
+
 import { join } from 'path'
 import {
   renderViaHTTP,
   fetchViaHTTP,
   findPort,
   launchApp,
-  killApp
+  killApp,
 } from 'next-test-utils'
 
-// test suits
+// test suites
 import rendering from './rendering'
 import client from './client'
 import csp from './csp'
 
 const context = {
-  output: ''
+  output: '',
 }
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 5
 
-const collectOutput = message => {
+const collectOutput = (message) => {
   context.output += message
 }
 
@@ -28,7 +27,7 @@ describe('Document and App', () => {
     context.appPort = await findPort()
     context.server = await launchApp(join(__dirname, '../'), context.appPort, {
       onStdout: collectOutput,
-      onStderr: collectOutput
+      onStderr: collectOutput,
     })
 
     // pre-build all pages at the start

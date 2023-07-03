@@ -1,37 +1,34 @@
 # Example app with Storybook
 
+This example shows a default set up of Storybook using [storybook-addon-next](https://github.com/RyanClementsHax/storybook-addon-next). Included in this example are stories that demonstrate the ability to use Next.js features in Storybook.
+
+### TypeScript
+
+As of v6.0, Storybook has built-in TypeScript support, so no configuration is needed. If you want to customize the default configuration, refer to the [TypeScript docs](https://storybook.js.org/docs/react/configure/typescript).
+
+## Deploy your own
+
+Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=next-example) or preview live with [StackBlitz](https://stackblitz.com/github/vercel/next.js/tree/canary/examples/with-storybook)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel/next.js/tree/canary/examples/with-storybook&project-name=with-storybook&repository-name=with-storybook)
+
 ## How to use
 
-### Using `create-next-app`
-
-Execute [`create-next-app`](https://github.com/zeit/next.js/tree/canary/packages/create-next-app) with [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/) or [npx](https://github.com/zkat/npx#readme) to bootstrap the example:
+Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [npm](https://docs.npmjs.com/cli/init), [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/), or [pnpm](https://pnpm.io) to bootstrap the example:
 
 ```bash
 npx create-next-app --example with-storybook with-storybook-app
-# or
+```
+
+```bash
 yarn create next-app --example with-storybook with-storybook-app
 ```
 
-### Download manually
-
-Download the example:
-
 ```bash
-curl https://codeload.github.com/zeit/next.js/tar.gz/canary | tar -xz --strip=2 next.js-canary/examples/with-storybook
-cd with-storybook
+pnpm create next-app --example with-storybook with-storybook-app
 ```
 
-Install it and run:
-
-```bash
-npm install
-npm run dev
-# or
-yarn
-yarn dev
-```
-
-## Run Storybook
+### Run Storybook
 
 ```bash
 npm run storybook
@@ -39,7 +36,7 @@ npm run storybook
 yarn storybook
 ```
 
-## Build Static Storybook
+### Build Static Storybook
 
 ```bash
 npm run build-storybook
@@ -47,17 +44,4 @@ npm run build-storybook
 yarn build-storybook
 ```
 
-Deploy Storybook to the cloud with [now](https://zeit.co/now) ([download](https://zeit.co/download))
-
-```bash
-npm run build-storybook
-# or
-yarn build-storybook
-# then
-cd storybook-static
-now
-```
-
-## The idea behind the example
-
-This example shows a default set up of Storybook. Also included in the example is a custom component included in both Storybook and the Next.js application.
+You can use [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=next-example) to deploy Storybook. Specify `storybook-static` as the output directory.

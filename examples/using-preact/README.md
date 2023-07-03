@@ -1,47 +1,35 @@
 # Preact example
 
+This example uses [Preact](https://github.com/preactjs/preact) instead of React. It's a React like UI framework which is fast and small.
+
+## Deploy your own
+
+Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=next-example) or preview live with [StackBlitz](https://stackblitz.com/github/vercel/next.js/tree/canary/examples/using-preact)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel/next.js/tree/canary/examples/using-preact)
+
 ## How to use
 
-### Using `create-next-app`
-
-Execute [`create-next-app`](https://github.com/zeit/next.js/tree/canary/packages/create-next-app) with [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/) or [npx](https://github.com/zkat/npx#readme) to bootstrap the example:
+Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [npm](https://docs.npmjs.com/cli/init), [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/), or [pnpm](https://pnpm.io) to bootstrap the example:
 
 ```bash
 npx create-next-app --example using-preact using-preact-app
-# or
+```
+
+```bash
 yarn create next-app --example using-preact using-preact-app
 ```
 
-### Download manually
-
-Download the example:
-
 ```bash
-curl https://codeload.github.com/zeit/next.js/tar.gz/canary | tar -xz --strip=2 next.js-canary/examples/using-preact
-cd using-preact
+pnpm create next-app --example using-preact using-preact-app
 ```
 
-Install it and run:
+Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=next-example) ([Documentation](https://nextjs.org/docs/deployment)).
 
-```bash
-npm install
-npm run dev
-# or
-yarn
-yarn dev
-```
+### Aliasing react -> preact
 
-Deploy it to the cloud with [now](https://zeit.co/now) ([download](https://zeit.co/download))
+Using `preact` with `next.js` depends on aliasing react packages to preact ones (like `@preact/compat`). This is done directly in the [`package.json`](./package.json) dependencies.
 
-```bash
-now
-```
+### next-plugin-preact
 
-## The idea behind the example
-
-This example uses [Preact](https://github.com/developit/preact) instead of React. It's a React like UI framework which is fast and small. Here we've customized Next.js to use Preact instead of React.
-
-Here's how we did it:
-
-- Use `next.config.js` to customize our webpack config by aliasing React to `preact/compat`
-- Use `server.js` to make our server use Preact by aliasing React to `preact/compat`
+This example was [updated](https://github.com/vercel/next.js/pull/18588) to use [`next-plugin-preact`](https://github.com/preactjs/next-plugin-preact) and now requires minimal configuration, if you want to add preact without a plugin, or see how it works, head to the previous [`next.config.js`](https://github.com/vercel/next.js/blob/629884af7d3ced97b8c2ec7aebdfb1a3a5d808f0/examples/using-preact/next.config.js).

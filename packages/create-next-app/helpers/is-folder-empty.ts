@@ -1,8 +1,9 @@
+/* eslint-disable import/no-extraneous-dependencies */
 import chalk from 'chalk'
 import fs from 'fs'
 import path from 'path'
 
-export function isFolderEmpty(root: string, name: string) {
+export function isFolderEmpty(root: string, name: string): boolean {
   const validFiles = [
     '.DS_Store',
     '.git',
@@ -22,13 +23,15 @@ export function isFolderEmpty(root: string, name: string) {
     'npm-debug.log',
     'yarn-debug.log',
     'yarn-error.log',
+    'yarnrc.yml',
+    '.yarn',
   ]
 
   const conflicts = fs
     .readdirSync(root)
-    .filter(file => !validFiles.includes(file))
+    .filter((file) => !validFiles.includes(file))
     // Support IntelliJ IDEA-based editors
-    .filter(file => !/\.iml$/.test(file))
+    .filter((file) => !/\.iml$/.test(file))
 
   if (conflicts.length > 0) {
     console.log(

@@ -1,10 +1,11 @@
-const { join } = require('path')
-const { promisify } = require('util')
-const globMod = require('glob')
+import { join } from 'path'
+import { promisify } from 'util'
+import globMod from 'glob'
+
 const glob = promisify(globMod)
 const resolveDataDir = join(__dirname, 'fixtures', '**/*')
 
-async function test () {
+async function test() {
   const time = process.hrtime()
   await glob(resolveDataDir)
 
@@ -14,7 +15,7 @@ async function test () {
   console.log(milliseconds)
 }
 
-async function run () {
+async function run() {
   for (let i = 0; i < 50; i++) {
     await test()
   }

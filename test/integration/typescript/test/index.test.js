@@ -1,5 +1,5 @@
 /* eslint-env jest */
-/* global jasmine */
+
 import { join } from 'path'
 import cheerio from 'cheerio'
 import { writeFile, remove } from 'fs-extra'
@@ -9,21 +9,19 @@ import {
   findPort,
   launchApp,
   killApp,
-  File
+  File,
 } from 'next-test-utils'
-
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 2
 
 const appDir = join(__dirname, '..')
 let appPort
 let app
 let output
 
-const handleOutput = msg => {
+const handleOutput = (msg) => {
   output += msg
 }
 
-async function get$ (path, query) {
+async function get$(path, query) {
   const html = await renderViaHTTP(appPort, path, query)
   return cheerio.load(html)
 }
@@ -35,7 +33,7 @@ describe('TypeScript Features', () => {
       appPort = await findPort()
       app = await launchApp(appDir, appPort, {
         onStdout: handleOutput,
-        onStderr: handleOutput
+        onStderr: handleOutput,
       })
     })
     afterAll(() => killApp(app))
@@ -43,10 +41,42 @@ describe('TypeScript Features', () => {
     it('should render the page', async () => {
       const $ = await get$('/hello')
       expect($('body').text()).toMatch(/Hello World/)
+      expect($('body').text()).toMatch(/1000000000000/)
     })
 
-    it('should report type checking to stdout', async () => {
+    it('should render the cookies page', async () => {
+      const $ = await get$('/ssr/cookies')
+      expect($('#cookies').text()).toBe('{}')
+    })
+
+    it('should render the generics page', async () => {
+      const $ = await get$('/generics')
+      expect($('#value').text()).toBe('Hello World from Generic')
+    })
+
+    it('should render the angle bracket type assertions page', async () => {
+      const $ = await get$('/angle-bracket-type-assertions')
+      expect($('#value').text()).toBe('test')
+    })
+
+    it('should resolve files in correct order', async () => {
+      const $ = await get$('/hello')
+      expect($('#imported-value').text()).toBe('OK')
+    })
+
+    // old behavior:
+    it.skip('should report type checking to stdout', async () => {
       expect(output).toContain('waiting for typecheck results...')
+    })
+
+    it('should respond to sync API route correctly', async () => {
+      const data = JSON.parse(await renderViaHTTP(appPort, '/api/sync'))
+      expect(data).toEqual({ code: 'ok' })
+    })
+
+    it('should respond to async API route correctly', async () => {
+      const data = JSON.parse(await renderViaHTTP(appPort, '/api/async'))
+      expect(data).toEqual({ code: 'ok' })
     })
 
     it('should not fail to render when an inactive page has an error', async () => {
@@ -62,6 +92,7 @@ export default function EvilPage(): JSX.Element {
 }
 `
         )
+        appPort = await findPort()
         app = await launchApp(appDir, appPort)
 
         const $ = await get$('/hello')
@@ -72,9 +103,38 @@ export default function EvilPage(): JSX.Element {
     })
   })
 
-  it('should compile the app', async () => {
+  it('should build the app', async () => {
     const output = await nextBuild(appDir, [], { stdout: true })
     expect(output.stdout).toMatch(/Compiled successfully/)
+    expect(output.code).toBe(0)
+  })
+
+  it('should build the app with functions in next.config.js', async () => {
+    const nextConfig = new File(join(appDir, 'next.config.js'))
+
+    nextConfig.write(`
+    module.exports = {
+      webpack(config) { return config },
+      onDemandEntries: {
+        // Make sure entries are not getting disposed.
+        maxInactiveAge: 1000 * 60 * 60,
+      },
+    }
+    `)
+
+    try {
+      const output = await nextBuild(appDir, [], { stdout: true })
+
+      expect(output.stdout).toMatch(/Compiled successfully/)
+      expect(output.code).toBe(0)
+    } finally {
+      nextConfig.restore()
+    }
+  })
+
+  it('should not inform when using default tsconfig path', async () => {
+    const output = await nextBuild(appDir, [], { stdout: true })
+    expect(output.stdout).not.toMatch(/Using tsconfig file:/)
   })
 
   describe('should compile with different types', () => {
@@ -83,9 +143,22 @@ export default function EvilPage(): JSX.Element {
       try {
         errorPage.replace('static ', 'static async ')
         const output = await nextBuild(appDir, [], { stdout: true })
+
         expect(output.stdout).toMatch(/Compiled successfully/)
       } finally {
         errorPage.restore()
+      }
+    })
+
+    it('should compile sync getStaticPaths & getStaticProps', async () => {
+      const page = new File(join(appDir, 'pages/ssg/[slug].tsx'))
+      try {
+        page.replace(/async \(/g, '(')
+        const output = await nextBuild(appDir, [], { stdout: true })
+
+        expect(output.stdout).toMatch(/Compiled successfully/)
+      } finally {
+        page.restore()
       }
     })
   })

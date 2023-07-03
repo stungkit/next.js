@@ -1,4 +1,3 @@
-import React from 'react'
 import PropTypes from 'prop-types'
 
 const ErrorMessage = ({ message }) => (
@@ -16,7 +15,7 @@ const ErrorMessage = ({ message }) => (
 )
 
 ErrorMessage.propTypes = {
-  message: PropTypes.string.isRequired
+  message: PropTypes.string.isRequired,
 }
 
 export default ErrorMessage

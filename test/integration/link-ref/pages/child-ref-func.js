@@ -8,17 +8,16 @@ export default () => {
     if (!myRef.current) {
       console.error(`ref wasn't updated`)
     }
-  }, [])
+  })
 
   return (
-    <Link href='/'>
-      <a
-        ref={el => {
-          myRef.current = el
-        }}
-      >
-        Click me
-      </a>
+    <Link
+      href="/"
+      ref={(el) => {
+        myRef.current = el
+      }}
+    >
+      Click me
     </Link>
   )
 }

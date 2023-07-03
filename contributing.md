@@ -1,101 +1,34 @@
 # Contributing to Next.js
 
-Our Commitment to Open Source can be found [here](https://zeit.co/blog/oss)
+[Watch the 40-minute walkthrough video on how to contribute to Next.js.](https://www.youtube.com/watch?v=cuoNzXFLitc)
 
-1. [Fork](https://help.github.com/articles/fork-a-repo/) this repository to your own GitHub account and then [clone](https://help.github.com/articles/cloning-a-repository/) it to your local device.
-2. Install yarn: `npm install -g yarn`
-3. Install the dependencies: `yarn`
-4. Run `yarn dev` to build and watch for code changes
-5. In a new terminal, run `yarn types` to compile declaration files from TypeScript
-6. The development branch is `canary` (this is the branch pull requests should be made against). On a release, the relevant parts of the changes in the `canary` branch are rebased into `master`.
+- Read about our [Commitment to Open Source](https://vercel.com/oss).
+- Before jumping into a PR be sure to search [existing PRs](https://github.com/vercel/next.js/pulls) or [issues](https://github.com/vercel/next.js/issues) for an open or closed item that relates to your submission.
 
-> You may need to run `yarn types` again if your types get outdated.
+## Repository
 
-## To run tests
+- [Triaging](./contributing/repository/triaging.md)
+- [Linting](./contributing/repository/linting.md)
+- [Release Channels and Publishing](./contributing/repository/release-channels-publishing.md)
+- [Pull Request Descriptions](./contributing/repository/pull-request-descriptions.md)
 
-Running all tests:
+## Documentation
 
-```sh
-yarn testonly
-```
+- [Adding Documentation](./contributing/docs/adding-documentation.md)
 
-Running a specific test suite inside of the `test/integration` directory:
+## Examples
 
-```sh
-yarn testonly --testPathPattern "production"
-```
+To contribute to [our examples](./examples), please see
 
-Running just one test in the `production` test suite:
+- [Adding Examples](./contributing/examples/adding-examples.md)
+- [Run Example Apps](./contributing/examples/run-example-apps.md)
 
-```sh
-yarn testonly --testPathPattern "production" -t "should allow etag header support"
-```
+## Core
 
-## Running the integration apps
-
-The correct path to the compiled `next` binary can be discovered by running:
-
-```sh
-find . -name next -perm -u=x -type f
-```
-
-Running examples can be done with:
-
-```sh
-./packages/next/dist/bin/next ./test/integration/basic
-# OR
-./packages/next/dist/bin/next ./examples/basic-css/
-```
-
-To figure out which pages are available for the given example, you can run:
-
-```sh
-EXAMPLE=./test/integration/basic
-(\
-  cd $EXAMPLE/pages; \
-  find . -type f \
-  | grep -v '\.next' \
-  | sed 's#^\.##' \
-  | sed 's#index\.js##' \
-  | sed 's#\.js$##' \
-  | xargs -I{} echo localhost:3000{} \
-)
-```
-
-## Running your own app with locally compiled version of Next.js
-
-1. In your app's `package.json`, replace:
-
-   ```json
-   "next": "<next-version>",
-   ```
-
-   with:
-
-   ```json
-   "next": "file:<local-path-to-cloned-nextjs-repo>/packages/next",
-   ```
-
-2. In your app's root directory, make sure to remove `next` from `node_modules` with:
-
-   ```sh
-   rm -rf ./node_modules/next
-   ```
-
-3. In your app's root directory, run:
-
-   ```sh
-   yarn
-   ```
-
-   to re-install all of the dependencies.
-
-   Note that Next will be copied from the locally compiled version as opposed to from being downloaded from the NPM registry.
-
-4. Run your application as you normally would.
-
-5. To update your app's dependencies, after you've made changes to your local `next` repository. In your app's root directory, run:
-
-   ```sh
-   yarn install --force
-   ```
+- [Developing](./contributing/core/developing.md)
+- [Building](./contributing/core/building.md)
+- [Testing](./contributing/core/testing.md)
+- [Adding Error Links](./contributing/core/adding-error-links.md)
+- [Adding a new feature](./contributing/core/adding-features.md)
+- [Developing Using Local App](./contributing/core/developing-using-local-app.md)
+<!-- - [Using the VS Code Debugger](./contributing/core/vscode-debugger.md) -->

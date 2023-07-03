@@ -1,5 +1,5 @@
 /* eslint-env jest */
-/* global jasmine */
+
 import { join } from 'path'
 import webdriver from 'next-webdriver'
 import {
@@ -7,17 +7,16 @@ import {
   findPort,
   launchApp,
   killApp,
-  waitFor
+  waitFor,
+  check,
 } from 'next-test-utils'
-
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 2
 
 const appDir = join(__dirname, '..')
 let output = ''
 let appPort
 let app
 
-const handleOutput = msg => {
+const handleOutput = (msg) => {
   output += msg
 }
 
@@ -26,7 +25,7 @@ describe('Empty Project', () => {
     appPort = await findPort()
     app = await launchApp(appDir, appPort, {
       onStdout: handleOutput,
-      onStderr: handleOutput
+      onStderr: handleOutput,
     })
   })
   afterAll(() => killApp(app))
@@ -49,20 +48,24 @@ describe('Empty Project', () => {
 
   it('should show empty object warning during client transition', async () => {
     const browser = await webdriver(appPort, '/static')
-    await browser.eval(`(function() {
-      window.gotWarn = false
-      const origWarn = console.warn
-      window.console.warn = function () {
-        if (arguments[0].match(/returned an empty object from \`getInitialProps\`/)) {
-          window.gotWarn = true
+    try {
+      await browser.eval(`(function() {
+        window.gotWarn = false
+        const origWarn = console.warn
+        window.console.warn = function () {
+          if (arguments[0].match(/returned an empty object from \`getInitialProps\`/)) {
+            window.gotWarn = true
+          }
+          origWarn.apply(this, arguments)
         }
-        origWarn.apply(this, arguments)
-      }
-      window.next.router.replace('/another')
-    })()`)
-    await waitFor(300)
-    const gotWarn = await browser.eval(`window.gotWarn`)
-    expect(gotWarn).toBe(true)
-    await browser.close()
+        window.next.router.replace('/another')
+      })()`)
+      await check(async () => {
+        const gotWarn = await browser.eval(`window.gotWarn`)
+        return gotWarn ? 'pass' : 'fail'
+      }, 'pass')
+    } finally {
+      await browser.close()
+    }
   })
 })

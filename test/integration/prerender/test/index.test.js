@@ -1,127 +1,96 @@
 /* eslint-env jest */
-/* global jasmine */
 import fs from 'fs-extra'
 import { join } from 'path'
 import webdriver from 'next-webdriver'
 import {
-  renderViaHTTP,
-  fetchViaHTTP,
+  check,
   findPort,
-  launchApp,
   killApp,
-  waitFor,
+  launchApp,
   nextBuild,
-  nextStart,
-  stopApp,
   nextExport,
+  renderViaHTTP,
   startStaticServer,
-  initNextServerScript
+  stopApp,
+  waitFor,
 } from 'next-test-utils'
 
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 2
 const appDir = join(__dirname, '..')
-const nextConfig = join(appDir, 'next.config.js')
+const nextConfigPath = join(appDir, 'next.config.js')
 let app
 let appPort
 let buildId
-let distPagesDir
 let exportDir
-let stderr
 
-const startServer = async (optEnv = {}) => {
-  const scriptPath = join(appDir, 'server.js')
-  const env = Object.assign(
-    {},
-    { ...process.env },
-    { PORT: `${appPort}` },
-    optEnv
-  )
-
-  return initNextServerScript(
-    scriptPath,
-    /ready on/i,
-    env,
-    /ReferenceError: options is not defined/
-  )
-}
-
-const expectedManifestRoutes = () => ({
-  '/': {
-    dataRoute: `/_next/data/${buildId}/index.json`,
-    initialRevalidateSeconds: 1,
-    srcRoute: null
-  },
-  '/blog/[post3]': {
-    dataRoute: `/_next/data/${buildId}/blog/[post3].json`,
-    initialRevalidateSeconds: 10,
-    srcRoute: '/blog/[post]'
-  },
-  '/blog/post-1': {
-    dataRoute: `/_next/data/${buildId}/blog/post-1.json`,
-    initialRevalidateSeconds: 10,
-    srcRoute: '/blog/[post]'
-  },
-  '/blog/post-2': {
-    dataRoute: `/_next/data/${buildId}/blog/post-2.json`,
-    initialRevalidateSeconds: 10,
-    srcRoute: '/blog/[post]'
-  },
-  '/blog/post-1/comment-1': {
-    dataRoute: `/_next/data/${buildId}/blog/post-1/comment-1.json`,
-    initialRevalidateSeconds: 2,
-    srcRoute: '/blog/[post]/[comment]'
-  },
-  '/blog/post-2/comment-2': {
-    dataRoute: `/_next/data/${buildId}/blog/post-2/comment-2.json`,
-    initialRevalidateSeconds: 2,
-    srcRoute: '/blog/[post]/[comment]'
-  },
-  '/blog/post.1': {
-    dataRoute: `/_next/data/${buildId}/blog/post.1.json`,
-    initialRevalidateSeconds: 10,
-    srcRoute: '/blog/[post]'
-  },
-  '/another': {
-    dataRoute: `/_next/data/${buildId}/another.json`,
-    initialRevalidateSeconds: 0,
-    srcRoute: null
-  },
-  '/blog': {
-    dataRoute: `/_next/data/${buildId}/blog.json`,
-    initialRevalidateSeconds: 10,
-    srcRoute: null
-  },
-  '/default-revalidate': {
-    dataRoute: `/_next/data/${buildId}/default-revalidate.json`,
-    initialRevalidateSeconds: 1,
-    srcRoute: null
-  },
-  '/something': {
-    dataRoute: `/_next/data/${buildId}/something.json`,
-    initialRevalidateSeconds: false,
-    srcRoute: null
-  }
-})
-
-const navigateTest = () => {
+const navigateTest = (dev = false) => {
   it('should navigate between pages successfully', async () => {
+    const toBuild = [
+      '/',
+      '/another',
+      '/something',
+      '/normal',
+      '/blog/post-1',
+      '/blog/post-1/comment-1',
+      '/catchall/first',
+    ]
+
+    await waitFor(2500)
+
+    await Promise.all(toBuild.map((pg) => renderViaHTTP(appPort, pg)))
+
     const browser = await webdriver(appPort, '/')
     let text = await browser.elementByCss('p').text()
     expect(text).toMatch(/hello.*?world/)
 
     // go to /another
-    await browser.elementByCss('#another').click()
-    await browser.waitForElementByCss('#home')
-    text = await browser.elementByCss('p').text()
-    expect(text).toMatch(/hello.*?world/)
+    async function goFromHomeToAnother() {
+      await browser.eval('window.beforeAnother = true')
+      await browser.elementByCss('#another').click()
+      await browser.waitForElementByCss('#home')
+      text = await browser.elementByCss('p').text()
+      expect(await browser.eval('window.beforeAnother')).toBe(true)
+      expect(text).toMatch(/hello.*?world/)
+    }
+    await goFromHomeToAnother()
 
     // go to /
-    await browser.eval('window.didTransition = 1')
-    await browser.elementByCss('#home').click()
-    await browser.waitForElementByCss('#another')
-    text = await browser.elementByCss('p').text()
-    expect(text).toMatch(/hello.*?world/)
-    expect(await browser.eval('window.didTransition')).toBe(1)
+    async function goFromAnotherToHome() {
+      await browser.eval('window.didTransition = 1')
+      await browser.elementByCss('#home').click()
+      await browser.waitForElementByCss('#another')
+      text = await browser.elementByCss('p').text()
+      expect(text).toMatch(/hello.*?world/)
+      expect(await browser.eval('window.didTransition')).toBe(1)
+    }
+    await goFromAnotherToHome()
+
+    // Client-side SSG data caching test
+    // eslint-disable-next-line no-lone-blocks
+    {
+      // Let revalidation period lapse
+      await waitFor(2000)
+
+      // Trigger revalidation (visit page)
+      await goFromHomeToAnother()
+      const snapTime = await browser.elementByCss('#anotherTime').text()
+
+      // Wait for revalidation to finish
+      await waitFor(2000)
+
+      // Re-visit page
+      await goFromAnotherToHome()
+      await goFromHomeToAnother()
+
+      const nextTime = await browser.elementByCss('#anotherTime').text()
+      if (dev) {
+        expect(snapTime).not.toMatch(nextTime)
+      } else {
+        expect(snapTime).toMatch(nextTime)
+      }
+
+      // Reset to Home for next test
+      await goFromAnotherToHome()
+    }
 
     // go to /something
     await browser.elementByCss('#something').click()
@@ -145,6 +114,82 @@ const navigateTest = () => {
     await browser.elementByCss('#home').click()
     await browser.waitForElementByCss('#comment-1')
 
+    // go to /index
+    await browser.elementByCss('#to-nested-index').click()
+    await browser.waitForElementByCss('#home')
+    text = await browser.elementByCss('p').text()
+    expect(text).toMatch(/hello nested index/)
+
+    // go to /
+    await browser.elementByCss('#home').click()
+    await browser.waitForElementByCss('#comment-1')
+
+    // go to /catchall-optional
+    await browser.elementByCss('#catchall-optional-root').click()
+    await browser.waitForElementByCss('#home')
+    text = await browser.elementByCss('p').text()
+    expect(text).toMatch(/Catch all: \[\]/)
+    expect(await browser.eval('window.didTransition')).toBe(1)
+
+    // go to /
+    await browser.elementByCss('#home').click()
+    await browser.waitForElementByCss('#comment-1')
+
+    // go to /dynamic/[first]
+    await browser.elementByCss('#dynamic-first').click()
+    await browser.waitForElementByCss('#home')
+    text = await browser.elementByCss('#param').text()
+    expect(text).toMatch(/Hi \[first\]!/)
+    expect(await browser.eval('window.didTransition')).toBe(1)
+
+    // go to /
+    await browser.elementByCss('#home').click()
+    await browser.waitForElementByCss('#comment-1')
+
+    // go to /dynamic/[second]
+    await browser.elementByCss('#dynamic-second').click()
+    await browser.waitForElementByCss('#home')
+    text = await browser.elementByCss('#param').text()
+    expect(text).toMatch(/Hi \[second\]!/)
+    expect(await browser.eval('window.didTransition')).toBe(1)
+
+    // go to /
+    await browser.elementByCss('#home').click()
+    await browser.waitForElementByCss('#comment-1')
+
+    // go to /catchall-explicit/[first]/[second]
+    await browser.elementByCss('#catchall-explicit-string').click()
+    await browser.waitForElementByCss('#home')
+    text = await browser.elementByCss('#catchall').text()
+    expect(text).toMatch(/Hi \[first\] \[second\]/)
+    expect(await browser.eval('window.didTransition')).toBe(1)
+
+    // go to /
+    await browser.elementByCss('#home').click()
+    await browser.waitForElementByCss('#comment-1')
+
+    // go to /catchall-explicit/[first]/[second]
+    await browser.elementByCss('#catchall-explicit-object').click()
+    await browser.waitForElementByCss('#home')
+    text = await browser.elementByCss('#catchall').text()
+    expect(text).toMatch(/Hi \[third\] \[fourth\]/)
+    expect(await browser.eval('window.didTransition')).toBe(1)
+
+    // go to /
+    await browser.elementByCss('#home').click()
+    await browser.waitForElementByCss('#comment-1')
+
+    // go to /catchall-optional/value
+    await browser.elementByCss('#catchall-optional-value').click()
+    await browser.waitForElementByCss('#home')
+    text = await browser.elementByCss('p').text()
+    expect(text).toMatch(/Catch all: \[value\]/)
+    expect(await browser.eval('window.didTransition')).toBe(1)
+
+    // go to /
+    await browser.elementByCss('#home').click()
+    await browser.waitForElementByCss('#comment-1')
+
     // go to /blog/post-1/comment-1
     await browser.elementByCss('#comment-1').click()
     await browser.waitForElementByCss('#home')
@@ -152,342 +197,171 @@ const navigateTest = () => {
     expect(text).toMatch(/Comment:.*?comment-1/)
     expect(await browser.eval('window.didTransition')).toBe(1)
 
+    // go to /catchall/first
+    await browser.elementByCss('#home').click()
+    await browser.waitForElementByCss('#to-catchall')
+    await browser.elementByCss('#to-catchall').click()
+    await browser.waitForElementByCss('#catchall')
+    text = await browser.elementByCss('#catchall').text()
+    expect(text).toMatch(/Hi.*?first/)
+    expect(await browser.eval('window.didTransition')).toBe(1)
+
     await browser.close()
   })
 }
 
-const runTests = (dev = false) => {
-  navigateTest()
-
-  it('should SSR normal page correctly', async () => {
-    const html = await renderViaHTTP(appPort, '/')
-    expect(html).toMatch(/hello.*?world/)
-  })
-
-  it('should SSR SPR page correctly', async () => {
-    const html = await renderViaHTTP(appPort, '/blog/post-1')
-    expect(html).toMatch(/Post:.*?post-1/)
-  })
-
-  it('should return data correctly', async () => {
-    const data = JSON.parse(
-      await renderViaHTTP(
-        appPort,
-        expectedManifestRoutes()['/something'].dataRoute
-      )
-    )
-    expect(data.pageProps.world).toBe('world')
-  })
-
-  it('should return data correctly for dynamic page', async () => {
-    const data = JSON.parse(
-      await renderViaHTTP(
-        appPort,
-        expectedManifestRoutes()['/blog/post-1'].dataRoute
-      )
-    )
-    expect(data.pageProps.post).toBe('post-1')
-  })
-
-  it('should return data correctly for dynamic page (non-seeded)', async () => {
-    const data = JSON.parse(
-      await renderViaHTTP(
-        appPort,
-        expectedManifestRoutes()['/blog/post-1'].dataRoute.replace(
-          /post-1/,
-          'post-3'
-        )
-      )
-    )
-    expect(data.pageProps.post).toBe('post-3')
-  })
-
-  it('should navigate to a normal page and back', async () => {
-    const browser = await webdriver(appPort, '/')
-    let text = await browser.elementByCss('p').text()
-    expect(text).toMatch(/hello.*?world/)
-
-    await browser.elementByCss('#normal').click()
-    await browser.waitForElementByCss('#normal-text')
-    text = await browser.elementByCss('#normal-text').text()
-    expect(text).toMatch(/a normal page/)
-  })
-
-  if (dev) {
-    it('should always call getStaticProps without caching in dev', async () => {
-      const initialRes = await fetchViaHTTP(appPort, '/something')
-      expect(initialRes.headers.get('cache-control')).toBeFalsy()
-      const initialHtml = await initialRes.text()
-      expect(initialHtml).toMatch(/hello.*?world/)
-
-      const newRes = await fetchViaHTTP(appPort, '/something')
-      expect(newRes.headers.get('cache-control')).toBeFalsy()
-      const newHtml = await newRes.text()
-      expect(newHtml).toMatch(/hello.*?world/)
-      expect(initialHtml !== newHtml).toBe(true)
-
-      const newerRes = await fetchViaHTTP(appPort, '/something')
-      expect(newerRes.headers.get('cache-control')).toBeFalsy()
-      const newerHtml = await newerRes.text()
-      expect(newerHtml).toMatch(/hello.*?world/)
-      expect(newHtml !== newerHtml).toBe(true)
-    })
-
-    it('should error on bad object from getStaticProps', async () => {
-      const indexPage = join(__dirname, '../pages/index.js')
-      const origContent = await fs.readFile(indexPage, 'utf8')
-      await fs.writeFile(
-        indexPage,
-        origContent.replace(/\/\/ bad-prop/, 'another: true,')
-      )
-      await waitFor(1000)
-      try {
-        const html = await renderViaHTTP(appPort, '/')
-        expect(html).toMatch(/Additional keys were returned/)
-      } finally {
-        await fs.writeFile(indexPage, origContent)
-      }
-    })
-
-    it('should show error when getStaticParams is used without getStaticProps', async () => {
-      const pagePath = join(appDir, 'pages/no-getStaticProps.js')
-      await fs.writeFile(
-        pagePath,
-        `
-        export async function unstable_getStaticParams() {
-          return []
-        }
-
-        export default () => 'hi'
-      `,
-        'utf8'
-      )
-
-      const html = await renderViaHTTP(appPort, '/no-getStaticProps')
-      await fs.remove(pagePath)
-      await waitFor(500)
-
-      expect(html).toMatch(
-        /unstable_getStaticParams was added without a unstable_getStaticProps in/
-      )
-    })
-  } else {
-    it('should should use correct caching headers for a no-revalidate page', async () => {
-      const initialRes = await fetchViaHTTP(appPort, '/something')
-      expect(initialRes.headers.get('cache-control')).toBe(
-        's-maxage=31536000, stale-while-revalidate'
-      )
-      const initialHtml = await initialRes.text()
-      expect(initialHtml).toMatch(/hello.*?world/)
-    })
-
-    it('outputs a prerender-manifest correctly', async () => {
-      const manifest = JSON.parse(
-        await fs.readFile(join(appDir, '.next/prerender-manifest.json'), 'utf8')
-      )
-      const escapedBuildId = buildId.replace(/[|\\{}()[\]^$+*?.-]/g, '\\$&')
-
-      expect(manifest.version).toBe(1)
-      expect(manifest.routes).toEqual(expectedManifestRoutes())
-      expect(manifest.dynamicRoutes).toEqual({
-        '/blog/[post]': {
-          dataRoute: `/_next/data/${buildId}/blog/[post].json`,
-          dataRouteRegex: `^\\/_next\\/data\\/${escapedBuildId}\\/blog\\/([^\\/]+?)\\.json$`,
-          routeRegex: '^\\/blog\\/([^\\/]+?)(?:\\/)?$'
-        },
-        '/blog/[post]/[comment]': {
-          dataRoute: `/_next/data/${buildId}/blog/[post]/[comment].json`,
-          dataRouteRegex: `^\\/_next\\/data\\/${escapedBuildId}\\/blog\\/([^\\/]+?)\\/([^\\/]+?)\\.json$`,
-          routeRegex: '^\\/blog\\/([^\\/]+?)\\/([^\\/]+?)(?:\\/)?$'
-        },
-        '/user/[user]/profile': {
-          dataRoute: `/_next/data/${buildId}/user/[user]/profile.json`,
-          dataRouteRegex: `^\\/_next\\/data\\/${escapedBuildId}\\/user\\/([^\\/]+?)\\/profile\\.json$`,
-          routeRegex: `^\\/user\\/([^\\/]+?)\\/profile(?:\\/)?$`
-        }
-      })
-    })
-
-    it('outputs prerendered files correctly', async () => {
-      const routes = [
-        '/another',
-        '/something',
-        '/blog/post-1',
-        '/blog/post-2/comment-2'
-      ]
-
-      for (const route of routes) {
-        await fs.access(join(distPagesDir, `${route}.html`), fs.constants.F_OK)
-        await fs.access(join(distPagesDir, `${route}.json`), fs.constants.F_OK)
-      }
-    })
-
-    it('should handle de-duping correctly', async () => {
-      let vals = new Array(10).fill(null)
-
-      vals = await Promise.all(
-        vals.map(() => renderViaHTTP(appPort, '/blog/post-10'))
-      )
-      const val = vals[0]
-      expect(val).toMatch(/Post:.*?post-10/)
-      expect(new Set(vals).size).toBe(1)
-    })
-
-    it('should not revalidate when set to false', async () => {
-      const route = '/something'
-      const initialHtml = await renderViaHTTP(appPort, route)
-      let newHtml = await renderViaHTTP(appPort, route)
-      expect(initialHtml).toBe(newHtml)
-
-      newHtml = await renderViaHTTP(appPort, route)
-      expect(initialHtml).toBe(newHtml)
-
-      newHtml = await renderViaHTTP(appPort, route)
-      expect(initialHtml).toBe(newHtml)
-    })
-
-    it('should handle revalidating HTML correctly', async () => {
-      const route = '/blog/post-2/comment-2'
-      const initialHtml = await renderViaHTTP(appPort, route)
-      expect(initialHtml).toMatch(/Post:.*?post-2/)
-      expect(initialHtml).toMatch(/Comment:.*?comment-2/)
-
-      let newHtml = await renderViaHTTP(appPort, route)
-      expect(newHtml).toBe(initialHtml)
-
-      await waitFor(2 * 1000)
-      await renderViaHTTP(appPort, route)
-
-      await waitFor(2 * 1000)
-      newHtml = await renderViaHTTP(appPort, route)
-      expect(newHtml === initialHtml).toBe(false)
-      expect(newHtml).toMatch(/Post:.*?post-2/)
-      expect(newHtml).toMatch(/Comment:.*?comment-2/)
-    })
-
-    it('should handle revalidating JSON correctly', async () => {
-      const route = `/_next/data/${buildId}/blog/post-2/comment-3.json`
-      const initialJson = await renderViaHTTP(appPort, route)
-      expect(initialJson).toMatch(/post-2/)
-      expect(initialJson).toMatch(/comment-3/)
-
-      let newJson = await renderViaHTTP(appPort, route)
-      expect(newJson).toBe(initialJson)
-
-      await waitFor(2 * 1000)
-      await renderViaHTTP(appPort, route)
-
-      await waitFor(2 * 1000)
-      newJson = await renderViaHTTP(appPort, route)
-      expect(newJson === initialJson).toBe(false)
-      expect(newJson).toMatch(/post-2/)
-      expect(newJson).toMatch(/comment-3/)
-    })
-
-    it('should not fetch prerender data on mount', async () => {
-      const browser = await webdriver(appPort, '/blog/post-100')
-      await browser.eval('window.thisShouldStay = true')
-      await waitFor(2 * 1000)
-      const val = await browser.eval('window.thisShouldStay')
-      expect(val).toBe(true)
-    })
-
-    it('should not error when flushing cache files', async () => {
-      await fetchViaHTTP(appPort, '/user/user-1/profile')
-      await waitFor(500)
-      expect(stderr).not.toMatch(/Failed to update prerender files for/)
-    })
-  }
-}
-
-describe('SPR Prerender', () => {
-  describe('dev mode', () => {
+describe('SSG Prerender', () => {
+  describe('dev mode getStaticPaths', () => {
     beforeAll(async () => {
+      await fs.writeFile(
+        nextConfigPath,
+        // we set cpus to 1 so that we make sure the requests
+        // aren't being cached at the jest-worker level
+        `module.exports = { experimental: { cpus: 1 } }`
+      )
+      await fs.remove(join(appDir, '.next'))
       appPort = await findPort()
       app = await launchApp(appDir, appPort, {
-        onStderr: msg => {
-          stderr += msg
-        }
+        env: { __NEXT_TEST_WITH_DEVTOOL: 1 },
       })
-      buildId = 'development'
     })
-    afterAll(() => killApp(app))
+    afterAll(async () => {
+      try {
+        await fs.remove(nextConfigPath)
+        await killApp(app)
+      } catch (err) {
+        console.error(err)
+      }
+    })
 
-    runTests(true)
-  })
+    it('should work with firebase import and getStaticPaths', async () => {
+      const html = await renderViaHTTP(appPort, '/blog/post-1')
+      expect(html).toContain('post-1')
+      expect(html).not.toContain('Error: Failed to load')
 
-  describe('serverless mode', () => {
-    beforeAll(async () => {
+      const html2 = await renderViaHTTP(appPort, '/blog/post-1')
+      expect(html2).toContain('post-1')
+      expect(html2).not.toContain('Error: Failed to load')
+    })
+
+    it('should not cache getStaticPaths errors', async () => {
+      const errMsg = /The `fallback` key must be returned from getStaticPaths/
+      await check(() => renderViaHTTP(appPort, '/blog/post-1'), /post-1/)
+
+      const blogPage = join(appDir, 'pages/blog/[post]/index.js')
+      const origContent = await fs.readFile(blogPage, 'utf8')
       await fs.writeFile(
-        nextConfig,
-        `module.exports = { target: 'serverless' }`,
-        'utf8'
+        blogPage,
+        origContent.replace('fallback: true,', '/* fallback: true, */')
       )
-      await nextBuild(appDir)
-      stderr = ''
-      appPort = await findPort()
-      app = nextStart(appDir, appPort, {
-        onStderr: msg => {
-          stderr += msg
-        }
-      })
-      distPagesDir = join(appDir, '.next/serverless/pages')
-      buildId = await fs.readFile(join(appDir, '.next/BUILD_ID'), 'utf8')
+
+      try {
+        await check(() => renderViaHTTP(appPort, '/blog/post-1'), errMsg)
+
+        await fs.writeFile(blogPage, origContent)
+        await check(() => renderViaHTTP(appPort, '/blog/post-1'), /post-1/)
+      } finally {
+        await fs.writeFile(blogPage, origContent)
+      }
     })
-    afterAll(() => killApp(app))
-
-    it('renders data correctly', async () => {
-      const port = await findPort()
-      const server = await startServer({
-        BUILD_ID: buildId,
-        PORT: port
-      })
-      const data = await renderViaHTTP(
-        port,
-        `/_next/data/${buildId}/index.json`
-      )
-      await killApp(server)
-      expect(JSON.parse(data).pageProps.world).toBe('world')
-    })
-
-    runTests()
-  })
-
-  describe('production mode', () => {
-    beforeAll(async () => {
-      await fs.remove(nextConfig)
-      await nextBuild(appDir)
-      stderr = ''
-      appPort = await findPort()
-      app = await nextStart(appDir, appPort, {
-        onStderr: msg => {
-          stderr += msg
-        }
-      })
-      buildId = await fs.readFile(join(appDir, '.next/BUILD_ID'), 'utf8')
-      distPagesDir = join(appDir, '.next/server/static', buildId, 'pages')
-    })
-    afterAll(() => killApp(app))
-
-    runTests()
   })
 
   describe('export mode', () => {
+    // disable fallback: true since this is an error during `next export`
+    const fallbackTruePages = [
+      '/blog/[post]/[comment].js',
+      '/user/[user]/profile.js',
+      '/catchall/[...slug].js',
+      '/non-json/[p].js',
+      '/blog/[post]/index.js',
+      '/fallback-only/[slug].js',
+      '/api-docs/[...slug].js',
+    ]
+    const fallbackBlockingPages = [
+      '/blocking-fallback/[slug].js',
+      '/blocking-fallback-once/[slug].js',
+      '/blocking-fallback-some/[slug].js',
+      '/non-json-blocking/[p].js',
+    ]
+
+    const brokenPages = ['/bad-gssp.js', '/bad-ssr.js']
+
+    const fallbackTruePageContents = {}
+    const fallbackBlockingPageContents = {}
+
     beforeAll(async () => {
       exportDir = join(appDir, 'out')
       await fs.writeFile(
-        nextConfig,
-        `module.exports = { exportTrailingSlash: true }`
+        nextConfigPath,
+        `module.exports = {
+          exportTrailingSlash: true,
+          exportPathMap: function(defaultPathMap) {
+            if (defaultPathMap['/blog/[post]']) {
+              throw new Error('Found Incremental page in the default export path map')
+            }
+            return defaultPathMap
+          },
+        }`
       )
-      await nextBuild(appDir)
-      await nextExport(appDir, { outdir: exportDir })
+      await fs.remove(join(appDir, '.next'))
+
+      for (const page of fallbackTruePages) {
+        const pagePath = join(appDir, 'pages', page)
+        fallbackTruePageContents[page] = await fs.readFile(pagePath, 'utf8')
+        await fs.writeFile(
+          pagePath,
+          fallbackTruePageContents[page].replace(
+            'fallback: true',
+            'fallback: false'
+          )
+        )
+      }
+
+      for (const page of fallbackBlockingPages) {
+        const pagePath = join(appDir, 'pages', page)
+        fallbackBlockingPageContents[page] = await fs.readFile(pagePath, 'utf8')
+        await fs.writeFile(
+          pagePath,
+          fallbackBlockingPageContents[page].replace(
+            "fallback: 'blocking'",
+            'fallback: false'
+          )
+        )
+      }
+
+      for (const page of brokenPages) {
+        const pagePath = join(appDir, 'pages', page)
+        await fs.rename(pagePath, `${pagePath}.bak`)
+      }
+
+      await nextBuild(appDir, undefined, { cwd: appDir })
+      await nextExport(appDir, { outdir: exportDir, cwd: appDir })
       app = await startStaticServer(exportDir)
       appPort = app.address().port
       buildId = await fs.readFile(join(appDir, '.next/BUILD_ID'), 'utf8')
     })
     afterAll(async () => {
-      await stopApp(app)
-      await fs.remove(nextConfig)
+      try {
+        stopApp(app)
+        await fs.remove(nextConfigPath)
+
+        for (const page of fallbackTruePages) {
+          const pagePath = join(appDir, 'pages', page)
+          await fs.writeFile(pagePath, fallbackTruePageContents[page])
+        }
+
+        for (const page of fallbackBlockingPages) {
+          const pagePath = join(appDir, 'pages', page)
+          await fs.writeFile(pagePath, fallbackBlockingPageContents[page])
+        }
+
+        for (const page of brokenPages) {
+          const pagePath = join(appDir, 'pages', page)
+          await fs.rename(`${pagePath}.bak`, pagePath)
+        }
+      } catch (err) {
+        console.error(err)
+      }
     })
 
     it('should copy prerender files and honor exportTrailingSlash', async () => {
@@ -495,7 +369,7 @@ describe('SPR Prerender', () => {
         '/another',
         '/something',
         '/blog/post-1',
-        '/blog/post-2/comment-2'
+        '/blog/post-2/comment-2',
       ]
 
       for (const route of routes) {

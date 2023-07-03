@@ -1,5 +1,5 @@
 /* eslint-env jest */
-/* global jasmine */
+
 import webdriver from 'next-webdriver'
 import { join } from 'path'
 import {
@@ -7,21 +7,18 @@ import {
   findPort,
   launchApp,
   killApp,
-  waitFor,
   runNextCommand,
   nextServer,
   startApp,
-  stopApp
+  stopApp,
 } from 'next-test-utils'
-
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 5
 
 let app
 let appPort
 let server
 const appDir = join(__dirname, '../')
 
-function runTests () {
+function runTests() {
   it('should render server value', async () => {
     const html = await renderViaHTTP(appPort, '/')
     expect(html).toMatch(/the-server-value/i)
@@ -29,11 +26,19 @@ function runTests () {
 
   it('should render dynamic server rendered values on client mount', async () => {
     const browser = await webdriver(appPort, '/')
-    await waitFor(5000)
     const text = await browser.elementByCss('#first-render').text()
 
     // Failure case is 'Index<!-- -->3<!-- --><!-- -->'
-    expect(text).toBe('Index<!-- -->1<!-- -->2<!-- -->3')
+    expect(text).toMatch(
+      /^Index<!--\/?(\$|\s)-->1(<!--\/?(\$|\s)-->)+2(<!--\/?(\$|\s)-->)+3(<!--\/?(\$|\s)-->)+4(<!--\/?(\$|\s)-->)+4$/
+    )
+    expect(await browser.eval('window.caughtErrors')).toBe('')
+
+    // should not print "invalid-dynamic-suspense" warning in browser's console
+    const logs = (await browser.log()).map((log) => log.message).join('\n')
+    expect(logs).not.toContain(
+      'https://nextjs.org/docs/messages/invalid-dynamic-suspense'
+    )
   })
 }
 
@@ -55,7 +60,7 @@ describe('next/dynamic', () => {
       app = nextServer({
         dir: appDir,
         dev: false,
-        quiet: true
+        quiet: true,
       })
 
       server = await startApp(app)

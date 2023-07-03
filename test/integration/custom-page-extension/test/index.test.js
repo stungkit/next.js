@@ -1,5 +1,5 @@
 /* eslint-env jest */
-/* global jasmine */
+
 import { join } from 'path'
 import {
   nextBuild,
@@ -8,11 +8,7 @@ import {
   launchApp,
   killApp,
   renderViaHTTP,
-  killAll,
-  File
 } from 'next-test-utils'
-
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 1
 
 const appDir = join(__dirname, '..')
 let appPort
@@ -46,22 +42,7 @@ describe('Custom page extension', () => {
       appPort = await findPort()
       app = await nextStart(appDir, appPort)
     })
-    afterAll(() => killAll(app))
-    runTests()
-  })
-
-  describe('serverless mode', () => {
-    const nextConfig = new File(join(appDir, 'next.config.js'))
-    beforeAll(async () => {
-      nextConfig.replace('server', 'serverless')
-      await nextBuild(appDir)
-      appPort = await findPort()
-      app = await nextStart(appDir, appPort)
-    })
-    afterAll(async () => {
-      await killApp(app)
-      nextConfig.restore()
-    })
+    afterAll(() => killApp(app))
     runTests()
   })
 })

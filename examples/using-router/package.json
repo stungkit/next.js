@@ -1,6 +1,5 @@
 {
-  "name": "using-router",
-  "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "next",
     "build": "next build",
@@ -8,8 +7,10 @@
   },
   "dependencies": {
     "next": "latest",
-    "react": "^16.7.0",
-    "react-dom": "^16.7.0"
-  },
-  "license": "ISC"
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "@types/react": "latest",
+    "@types/node": "latest"
+  }
 }

@@ -8,11 +8,11 @@ export default () => {
     if (!myRef.current) {
       console.error(`ref wasn't updated`)
     }
-  }, [])
+  })
 
   return (
-    <Link href='/'>
-      <a ref={myRef}>Click me</a>
+    <Link href="/" ref={myRef}>
+      Click me
     </Link>
   )
 }

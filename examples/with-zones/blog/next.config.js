@@ -1,9 +1,6 @@
-const assetPrefix = process.env.BUILDING_FOR_NOW ? '/blog' : ''
-
-module.exports = {
-  target: 'serverless',
-  assetPrefix,
-  env: {
-    ASSET_PREFIX: assetPrefix
-  }
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  basePath: '/blog',
 }
+
+module.exports = nextConfig

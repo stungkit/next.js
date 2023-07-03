@@ -1,15 +1,13 @@
 {
+  "private": true,
   "scripts": {
     "dev": "next",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
-    "babel-plugin-styled-components": "^1.1.7",
     "next": "latest",
-    "react": "^16.7.0",
-    "react-dom": "^16.7.0",
-    "rebass": "1.0.0-1",
-    "styled-components": "^2.1.1"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }

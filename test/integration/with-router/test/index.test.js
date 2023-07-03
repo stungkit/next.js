@@ -1,39 +1,29 @@
 /* eslint-env jest */
-/* global jasmine */
+
+import {
+  findPort,
+  getRedboxHeader,
+  hasRedbox,
+  killApp,
+  launchApp,
+  nextBuild,
+  nextStart,
+} from 'next-test-utils'
 import webdriver from 'next-webdriver'
 import { join } from 'path'
-import {
-  getReactErrorOverlayContent,
-  nextServer,
-  launchApp,
-  findPort,
-  killApp,
-  nextBuild,
-  startApp,
-  stopApp
-} from 'next-test-utils'
-
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 5
 
 describe('withRouter', () => {
   const appDir = join(__dirname, '../')
   let appPort
-  let server
   let app
 
   beforeAll(async () => {
     await nextBuild(appDir)
-    app = nextServer({
-      dir: join(__dirname, '../'),
-      dev: false,
-      quiet: true
-    })
-
-    server = await startApp(app)
-    appPort = server.address().port
+    appPort = await findPort()
+    app = await nextStart(appDir, appPort)
   })
 
-  afterAll(() => stopApp(server))
+  afterAll(() => killApp(app))
 
   it('allows observation of navigation events using withRouter', async () => {
     const browser = await webdriver(appPort, '/a')
@@ -96,7 +86,9 @@ describe('withRouter SSR', () => {
 
   beforeAll(async () => {
     port = await findPort()
-    server = await launchApp(join(__dirname, '..'), port)
+    server = await launchApp(join(__dirname, '..'), port, {
+      env: { __NEXT_TEST_WITH_DEVTOOL: 1 },
+    })
   })
   afterAll(async () => {
     await killApp(server)
@@ -104,8 +96,9 @@ describe('withRouter SSR', () => {
 
   it('should show an error when trying to use router methods during SSR', async () => {
     const browser = await webdriver(port, '/router-method-ssr')
-    expect(await getReactErrorOverlayContent(browser)).toMatch(
-      `No router instance found. you should only use "next/router" inside the client side of your app. https://err.sh/`
+    expect(await hasRedbox(browser, true)).toBe(true)
+    expect(await getRedboxHeader(browser)).toMatch(
+      `No router instance found. you should only use "next/router" inside the client side of your app. https://`
     )
     await browser.close()
   })

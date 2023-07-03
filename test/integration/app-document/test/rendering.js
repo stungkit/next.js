@@ -5,35 +5,33 @@ import cheerio from 'cheerio'
 import { check, File, waitFor } from 'next-test-utils'
 
 export default function ({ app }, suiteName, render, fetch) {
-  async function get$ (path, query) {
+  async function get$(path, query) {
     const html = await render(path, query)
     return cheerio.load(html)
   }
 
   describe(suiteName, () => {
     describe('_document', () => {
-      test('It has a custom html class', async () => {
+      test('should include required elements in rendered html', async () => {
         const $ = await get$('/')
-        expect($('html').hasClass('test-html-props'))
+        // It has a custom html class
+        expect($('html').hasClass('test-html-props')).toBe(true)
+        // It has a custom body class
+        expect($('body').hasClass('custom_class')).toBe(true)
+        // It injects custom head tags
+        expect($('head').text()).toMatch('body { margin: 0 }')
+        // It has __NEXT_DATA__ script tag
+        expect($('script#__NEXT_DATA__')).toBeTruthy()
+        // It passes props from Document.getInitialProps to Document
+        expect($('#custom-property').text()).toBe('Hello Document')
       })
 
-      test('It has a custom body class', async () => {
-        const $ = await get$('/')
-        expect($('body').hasClass('custom_class'))
-      })
-
-      test('It injects custom head tags', async () => {
-        const $ = await get$('/')
-        expect(
-          $('head')
-            .text()
-            .includes('body { margin: 0 }')
-        )
-      })
-
-      test('It passes props from Document.getInitialProps to Document', async () => {
-        const $ = await get$('/')
-        expect($('#custom-property').text() === 'Hello Document')
+      it('Document.getInitialProps returns html prop representing app shell', async () => {
+        // Extract css-in-js-class from the rendered HTML, which is returned by Document.getInitialProps
+        const $index = await get$('/')
+        const $about = await get$('/about')
+        expect($index('#css-in-cjs-count').text()).toBe('2')
+        expect($about('#css-in-cjs-count').text()).toBe('0')
       })
 
       test('It adds nonces to all scripts and preload links', async () => {
@@ -57,49 +55,35 @@ export default function ({ app }, suiteName, render, fetch) {
       test('It renders ctx.renderPage with enhancer correctly', async () => {
         const $ = await get$('/?withEnhancer=true')
         const nonce = 'RENDERED'
-        expect(
-          $('#render-page-enhance-component')
-            .text()
-            .includes(nonce)
-        ).toBe(true)
+        expect($('#render-page-enhance-component').text().includes(nonce)).toBe(
+          true
+        )
       })
 
       test('It renders ctx.renderPage with enhanceComponent correctly', async () => {
         const $ = await get$('/?withEnhanceComponent=true')
         const nonce = 'RENDERED'
-        expect(
-          $('#render-page-enhance-component')
-            .text()
-            .includes(nonce)
-        ).toBe(true)
+        expect($('#render-page-enhance-component').text().includes(nonce)).toBe(
+          true
+        )
       })
 
       test('It renders ctx.renderPage with enhanceApp correctly', async () => {
         const $ = await get$('/?withEnhanceApp=true')
         const nonce = 'RENDERED'
-        expect(
-          $('#render-page-enhance-app')
-            .text()
-            .includes(nonce)
-        ).toBe(true)
+        expect($('#render-page-enhance-app').text().includes(nonce)).toBe(true)
       })
 
       test('It renders ctx.renderPage with enhanceApp and enhanceComponent correctly', async () => {
         const $ = await get$('/?withEnhanceComponent=true&withEnhanceApp=true')
         const nonce = 'RENDERED'
-        expect(
-          $('#render-page-enhance-app')
-            .text()
-            .includes(nonce)
-        ).toBe(true)
-        expect(
-          $('#render-page-enhance-component')
-            .text()
-            .includes(nonce)
-        ).toBe(true)
+        expect($('#render-page-enhance-app').text().includes(nonce)).toBe(true)
+        expect($('#render-page-enhance-component').text().includes(nonce)).toBe(
+          true
+        )
       })
 
-      // This is a workaround to fix https://github.com/zeit/next.js/issues/5860
+      // This is a workaround to fix https://github.com/vercel/next.js/issues/5860
       // TODO: remove this workaround when https://bugs.webkit.org/show_bug.cgi?id=187726 is fixed.
       test('It adds a timestamp to link tags with preload attribute to invalidate the cache (DEV only)', async () => {
         const $ = await get$('/')
@@ -119,14 +103,14 @@ export default function ({ app }, suiteName, render, fetch) {
     describe('_app', () => {
       test('It shows a custom tag', async () => {
         const $ = await get$('/')
-        expect($('hello-app').text() === 'Hello App')
+        expect($('#hello-app').text()).toBe('Hello App')
       })
 
       // For example react context uses shared module state
       // Also known as singleton modules
       test('It should share module state with pages', async () => {
         const $ = await get$('/shared')
-        expect($('#currentstate').text() === 'UPDATED')
+        expect($('#currentstate').text()).toBe('UPDATED')
       })
 
       test('It should show valid error when thrown in _app getInitialProps', async () => {

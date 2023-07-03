@@ -16,6 +16,7 @@ app.on('ready', async () => {
     height: 600,
     webPreferences: {
       nodeIntegration: false,
+      contextIsolation: false,
       preload: join(__dirname, 'preload.js'),
     },
   })
@@ -23,7 +24,7 @@ app.on('ready', async () => {
   const url = isDev
     ? 'http://localhost:8000/'
     : format({
-        pathname: join(__dirname, '../renderer/index.html'),
+        pathname: join(__dirname, '../renderer/out/index.html'),
         protocol: 'file:',
         slashes: true,
       })
@@ -36,5 +37,6 @@ app.on('window-all-closed', app.quit)
 
 // listen the channel `message` and resend the received message to the renderer process
 ipcMain.on('message', (event: IpcMainEvent, message: any) => {
-  event.sender.send('message', message)
+  console.log(message)
+  setTimeout(() => event.sender.send('message', 'hi from electron'), 500)
 })

@@ -1,3 +1,6 @@
-# Material-UI example
+# Material UI examples
 
-Source code is hosted on the [Material-UI](https://github.com/mui-org/material-ui/tree/master/examples/nextjs) repository.
+**Note:** These examples are maintained outside of the Next.js repository:
+
+1. Official [TypeScript example](https://github.com/mui/material-ui/tree/master/examples/material-next-ts)
+2. Official [JavaScript example](https://github.com/mui/material-ui/tree/master/examples/material-next)

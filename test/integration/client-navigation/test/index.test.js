@@ -1,64 +1,50 @@
 /* eslint-env jest */
-/* global jasmine */
-import { join } from 'path'
-import webdriver from 'next-webdriver'
-import renderingSuite from './rendering'
+
 import {
-  waitFor,
-  findPort,
-  killApp,
-  launchApp,
   fetchViaHTTP,
+  findPort,
+  getRedboxSource,
+  hasRedbox,
+  killApp,
+  getRedboxHeader,
+  launchApp,
   renderViaHTTP,
-  getReactErrorOverlayContent
+  waitFor,
+  check,
 } from 'next-test-utils'
+import webdriver from 'next-webdriver'
+import { join } from 'path'
+import renderingSuite from './rendering'
 
 const context = {}
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 1000 * 60 * 5
 
 describe('Client Navigation', () => {
   beforeAll(async () => {
     context.appPort = await findPort()
-    context.server = await launchApp(join(__dirname, '../'), context.appPort)
-
-    const prerender = [
-      '/async-props',
-      '/default-head',
-      '/empty-get-initial-props',
-      '/error',
-      '/finish-response',
-      '/head',
-      '/json',
-      '/link',
-      '/stateless',
-      '/fragment-syntax',
-      '/custom-extension',
-      '/styled-jsx',
-      '/with-cdm',
-      '/url-prop',
-      '/url-prop-override',
-
-      '/dynamic/ssr',
-
-      '/nav',
-      '/nav/about',
-      '/nav/on-click',
-      '/nav/querystring',
-      '/nav/self-reload',
-      '/nav/hash-changes',
-      '/nav/shallow-routing',
-      '/nav/redirect',
-      '/nav/as-path',
-      '/nav/as-path-using-router',
-      '/nav/url-prop-change',
-
-      '/nested-cdm/index'
-    ]
-    await Promise.all(
-      prerender.map(route => renderViaHTTP(context.appPort, route))
-    )
+    context.server = await launchApp(join(__dirname, '../'), context.appPort, {
+      env: { __NEXT_TEST_WITH_DEVTOOL: 1 },
+    })
   })
   afterAll(() => killApp(context.server))
+
+  it('should not reload when visiting /_error directly', async () => {
+    const { status } = await fetchViaHTTP(context.appPort, '/_error')
+    const browser = await webdriver(context.appPort, '/_error')
+
+    await browser.eval('window.hello = true')
+
+    // wait on-demand-entries timeout since it can trigger
+    // reloading non-stop
+    for (let i = 0; i < 15; i++) {
+      expect(await browser.eval('window.hello')).toBe(true)
+      await waitFor(1000)
+    }
+    const html = await browser.eval('document.documentElement.innerHTML')
+
+    expect(status).toBe(404)
+    expect(html).toContain('This page could not be found')
+    expect(html).toContain('404')
+  })
 
   describe('with <Link/>', () => {
     it('should navigate the page', async () => {
@@ -72,6 +58,54 @@ describe('Client Navigation', () => {
 
       expect(text).toBe('This is the about page.')
       await browser.close()
+    })
+
+    it('should have proper error when no children are provided', async () => {
+      const browser = await webdriver(context.appPort, '/link-no-child')
+      expect(await hasRedbox(browser, true)).toBe(true)
+      expect(await getRedboxHeader(browser)).toContain(
+        'No children were passed to <Link> with `href` of `/about` but one child is required'
+      )
+    })
+
+    it('should not throw error when one number type child is provided', async () => {
+      const browser = await webdriver(context.appPort, '/link-number-child')
+      expect(await hasRedbox(browser, false)).toBe(false)
+      if (browser) await browser.close()
+    })
+
+    it('should navigate back after reload', async () => {
+      const browser = await webdriver(context.appPort, '/nav')
+      await browser.elementByCss('#about-link').click()
+      await browser.waitForElementByCss('.nav-about')
+      await browser.refresh()
+      await waitFor(3000)
+      await browser.back()
+      await waitFor(3000)
+      const text = await browser.elementByCss('#about-link').text()
+      if (browser) await browser.close()
+      expect(text).toMatch(/About/)
+    })
+
+    it('should navigate forwards after reload', async () => {
+      const browser = await webdriver(context.appPort, '/nav')
+      await browser.elementByCss('#about-link').click()
+      await browser.waitForElementByCss('.nav-about')
+      await browser.back()
+      await browser.refresh()
+      await waitFor(3000)
+      await browser.forward()
+      await waitFor(3000)
+      const text = await browser.elementByCss('p').text()
+      if (browser) await browser.close()
+      expect(text).toMatch(/this is the about page/i)
+    })
+
+    it('should error when calling onClick without event', async () => {
+      const browser = await webdriver(context.appPort, '/link-invalid-onclick')
+      expect(await browser.elementByCss('#errors').text()).toBe('0')
+      await browser.elementByCss('#custom-button').click()
+      expect(await browser.elementByCss('#errors').text()).toBe('1')
     })
 
     it('should navigate via the client side', async () => {
@@ -92,29 +126,61 @@ describe('Client Navigation', () => {
       expect(counterText).toBe('Counter: 1')
       await browser.close()
     })
-  })
 
-  describe('With url property', () => {
-    it('Should keep immutable pathname, asPath and query', async () => {
-      const browser = await webdriver(context.appPort, '/nav/url-prop-change')
-      await browser.elementByCss('#add-query').click()
-      const urlResult = await browser.elementByCss('#url-result').text()
-      const previousUrlResult = await browser
-        .elementByCss('#previous-url-result')
+    it('should navigate an absolute url', async () => {
+      const browser = await webdriver(
+        context.appPort,
+        `/absolute-url?port=${context.appPort}`
+      )
+      await browser.waitForElementByCss('#absolute-link').click()
+      await check(
+        () => browser.eval(() => window.location.origin),
+        'https://vercel.com'
+      )
+    })
+
+    it('should call mouse handlers with an absolute url', async () => {
+      const browser = await webdriver(
+        context.appPort,
+        `/absolute-url?port=${context.appPort}`
+      )
+
+      await browser.elementByCss('#absolute-link-mouse-events').moveTo()
+
+      expect(
+        await browser
+          .waitForElementByCss('#absolute-link-mouse-events')
+          .getAttribute('data-hover')
+      ).toBe('true')
+    })
+
+    it('should navigate an absolute local url', async () => {
+      const browser = await webdriver(
+        context.appPort,
+        `/absolute-url?port=${context.appPort}`
+      )
+      await browser.eval(() => (window._didNotNavigate = true))
+      await browser.waitForElementByCss('#absolute-local-link').click()
+      const text = await browser
+        .waitForElementByCss('.nav-about')
+        .elementByCss('p')
         .text()
 
-      expect(JSON.parse(urlResult)).toMatchObject({
-        query: { added: 'yes' },
-        pathname: '/nav/url-prop-change',
-        asPath: '/nav/url-prop-change?added=yes'
-      })
-      expect(JSON.parse(previousUrlResult)).toMatchObject({
-        query: {},
-        pathname: '/nav/url-prop-change',
-        asPath: '/nav/url-prop-change'
-      })
+      expect(text).toBe('This is the about page.')
+      expect(await browser.eval(() => window._didNotNavigate)).toBe(true)
+    })
 
-      await browser.close()
+    it('should navigate an absolute local url with as', async () => {
+      const browser = await webdriver(
+        context.appPort,
+        `/absolute-url?port=${context.appPort}`
+      )
+      await browser.eval(() => (window._didNotNavigate = true))
+      await browser.waitForElementByCss('#absolute-local-dynamic-link').click()
+      expect(await browser.waitForElementByCss('#dynamic-page').text()).toBe(
+        'hello'
+      )
+      expect(await browser.eval(() => window._didNotNavigate)).toBe(true)
     })
   })
 
@@ -135,15 +201,49 @@ describe('Client Navigation', () => {
     it('should not navigate if the <a/> tag has a target', async () => {
       const browser = await webdriver(context.appPort, '/nav')
 
-      const counterText = await browser
+      await browser
         .elementByCss('#increase')
         .click()
         .elementByCss('#target-link')
         .click()
-        .elementByCss('#counter')
-        .text()
+
+      await waitFor(1000)
+
+      const counterText = await browser.elementByCss('#counter').text()
 
       expect(counterText).toBe('Counter: 1')
+      await browser.close()
+    })
+
+    it('should not navigate if the click-event is modified', async () => {
+      const browser = await webdriver(context.appPort, '/nav')
+
+      await browser.elementByCss('#increase').click()
+
+      const key = process.platform === 'darwin' ? 'Meta' : 'Control'
+
+      await browser.keydown(key)
+
+      await browser.elementByCss('#in-svg-link').click()
+
+      await browser.keyup(key)
+      await waitFor(1000)
+
+      const counterText = await browser.elementByCss('#counter').text()
+
+      expect(counterText).toBe('Counter: 1')
+      await browser.close()
+    })
+
+    it('should not reload when link in svg is clicked', async () => {
+      const browser = await webdriver(context.appPort, '/nav')
+      await browser.eval('window.hello = true')
+      await browser
+        .elementByCss('#in-svg-link')
+        .click()
+        .waitForElementByCss('.nav-about')
+
+      expect(await browser.eval('window.hello')).toBe(true)
       await browser.close()
     })
   })
@@ -182,10 +282,8 @@ describe('Client Navigation', () => {
       try {
         browser = await webdriver(context.appPort, '/nav')
         await browser.elementByCss('#empty-props').click()
-
-        await waitFor(3000)
-
-        expect(await getReactErrorOverlayContent(browser)).toMatch(
+        expect(await hasRedbox(browser, true)).toBe(true)
+        expect(await getRedboxHeader(browser)).toMatch(
           /should resolve to an object\. But found "null" instead\./
         )
       } finally {
@@ -370,8 +468,127 @@ describe('Client Navigation', () => {
       }
     })
   })
+  describe('resets scroll at the correct time', () => {
+    it('should reset scroll before the new page runs its lifecycles (<Link />)', async () => {
+      let browser
+      try {
+        browser = await webdriver(
+          context.appPort,
+          '/nav/long-page-to-snap-scroll'
+        )
+
+        // Scrolls to item 400 on the page
+        await browser
+          .waitForElementByCss('#long-page-to-snap-scroll')
+          .elementByCss('#scroll-to-item-400')
+          .click()
+
+        const scrollPosition = await browser.eval('window.pageYOffset')
+        expect(scrollPosition).toBe(7208)
+
+        // Go to snap scroll page
+        await browser
+          .elementByCss('#goto-snap-scroll-position')
+          .click()
+          .waitForElementByCss('#scroll-pos-y')
+
+        const snappedScrollPosition = await browser.eval(
+          'document.getElementById("scroll-pos-y").innerText'
+        )
+        expect(snappedScrollPosition).toBe('0')
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+
+    it('should reset scroll before the new page runs its lifecycles (Router#push)', async () => {
+      let browser
+      try {
+        browser = await webdriver(
+          context.appPort,
+          '/nav/long-page-to-snap-scroll'
+        )
+
+        // Scrolls to item 400 on the page
+        await browser
+          .waitForElementByCss('#long-page-to-snap-scroll')
+          .elementByCss('#scroll-to-item-400')
+          .click()
+
+        const scrollPosition = await browser.eval('window.pageYOffset')
+        expect(scrollPosition).toBe(7208)
+
+        // Go to snap scroll page
+        await browser
+          .elementByCss('#goto-snap-scroll-position-imperative')
+          .click()
+          .waitForElementByCss('#scroll-pos-y')
+
+        const snappedScrollPosition = await browser.eval(
+          'document.getElementById("scroll-pos-y").innerText'
+        )
+        expect(snappedScrollPosition).toBe('0')
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+
+    it('should intentionally not reset scroll before the new page runs its lifecycles (Router#push)', async () => {
+      let browser
+      try {
+        browser = await webdriver(
+          context.appPort,
+          '/nav/long-page-to-snap-scroll'
+        )
+
+        // Scrolls to item 400 on the page
+        await browser
+          .waitForElementByCss('#long-page-to-snap-scroll')
+          .elementByCss('#scroll-to-item-400')
+          .click()
+
+        const scrollPosition = await browser.eval('window.pageYOffset')
+        expect(scrollPosition).toBe(7208)
+
+        // Go to snap scroll page
+        await browser
+          .elementByCss('#goto-snap-scroll-position-imperative-noscroll')
+          .click()
+          .waitForElementByCss('#scroll-pos-y')
+
+        const snappedScrollPosition = await browser.eval(
+          'document.getElementById("scroll-pos-y").innerText'
+        )
+        expect(snappedScrollPosition).not.toBe('0')
+        expect(Number(snappedScrollPosition)).toBeGreaterThanOrEqual(7208)
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+  })
 
   describe('with hash changes', () => {
+    describe('check hydration mis-match', () => {
+      it('should not have hydration mis-match for hash link', async () => {
+        const browser = await webdriver(context.appPort, '/nav/hash-changes')
+        const browserLogs = await browser.log('browser')
+        let found = false
+        browserLogs.forEach((log) => {
+          console.log('log.message', log.message)
+          if (log.message.includes('Warning: Prop')) {
+            found = true
+          }
+        })
+        expect(found).toEqual(false)
+      })
+    })
+
     describe('when hash change via Link', () => {
       it('should not run getInitialProps', async () => {
         const browser = await webdriver(context.appPort, '/nav/hash-changes')
@@ -393,25 +610,63 @@ describe('Client Navigation', () => {
           browser = await webdriver(context.appPort, '/nav/hash-changes')
 
           // Scrolls to item 400 on the page
-          const scrollPosition = await browser
-            .elementByCss('#scroll-to-item-400')
-            .click()
-            .eval('window.pageYOffset')
+          await browser.elementByCss('#scroll-to-item-400').click()
 
-          expect(scrollPosition).toBe(7258)
+          const scrollPositionBeforeEmptyHash = await browser.eval(
+            'window.pageYOffset'
+          )
+
+          expect(scrollPositionBeforeEmptyHash).toBe(7258)
 
           // Scrolls back to top when scrolling to `#` with no value.
-          const scrollPositionAfterEmptyHash = await browser
-            .elementByCss('#via-empty-hash')
-            .click()
-            .eval('window.pageYOffset')
+          await browser.elementByCss('#via-empty-hash').click()
+
+          const scrollPositionAfterEmptyHash = await browser.eval(
+            'window.pageYOffset'
+          )
 
           expect(scrollPositionAfterEmptyHash).toBe(0)
+
+          // Scrolls to item 400 on the page
+          await browser.elementByCss('#scroll-to-item-400').click()
+
+          const scrollPositionBeforeTopHash = await browser.eval(
+            'window.pageYOffset'
+          )
+
+          expect(scrollPositionBeforeTopHash).toBe(7258)
+
+          // Scrolls back to top when clicking link with href `#top`.
+          await browser.elementByCss('#via-top-hash').click()
+
+          const scrollPositionAfterTopHash = await browser.eval(
+            'window.pageYOffset'
+          )
+
+          expect(scrollPositionAfterTopHash).toBe(0)
+
+          // Scrolls to cjk anchor on the page
+          await browser.elementByCss('#scroll-to-cjk-anchor').click()
+
+          const scrollPositionCJKHash = await browser.eval('window.pageYOffset')
+
+          expect(scrollPositionCJKHash).toBe(17436)
         } finally {
           if (browser) {
             await browser.close()
           }
         }
+      })
+
+      it('should not scroll to hash when scroll={false} is set', async () => {
+        const browser = await webdriver(context.appPort, '/nav/hash-changes')
+        const curScroll = await browser.eval(
+          'document.documentElement.scrollTop'
+        )
+        await browser.elementByCss('#scroll-to-name-item-400-no-scroll').click()
+        expect(curScroll).toBe(
+          await browser.eval('document.documentElement.scrollTop')
+        )
       })
 
       it('should scroll to the specified position on the same page with a name property', async () => {
@@ -420,20 +675,18 @@ describe('Client Navigation', () => {
           browser = await webdriver(context.appPort, '/nav/hash-changes')
 
           // Scrolls to item 400 with name="name-item-400" on the page
-          const scrollPosition = await browser
-            .elementByCss('#scroll-to-name-item-400')
-            .click()
-            .eval('window.pageYOffset')
+          await browser.elementByCss('#scroll-to-name-item-400').click()
 
-          console.log(scrollPosition)
+          const scrollPosition = await browser.eval('window.pageYOffset')
 
           expect(scrollPosition).toBe(16258)
 
           // Scrolls back to top when scrolling to `#` with no value.
-          const scrollPositionAfterEmptyHash = await browser
-            .elementByCss('#via-empty-hash')
-            .click()
-            .eval('window.pageYOffset')
+          await browser.elementByCss('#via-empty-hash').click()
+
+          const scrollPositionAfterEmptyHash = await browser.eval(
+            'window.pageYOffset'
+          )
 
           expect(scrollPositionAfterEmptyHash).toBe(0)
         } finally {
@@ -456,6 +709,42 @@ describe('Client Navigation', () => {
 
           const scrollPosition = await browser.eval('window.pageYOffset')
           expect(scrollPosition).toBe(7258)
+        } finally {
+          if (browser) {
+            await browser.close()
+          }
+        }
+      })
+
+      it('should scroll to the specified CJK position to a new page', async () => {
+        let browser
+        try {
+          browser = await webdriver(context.appPort, '/nav')
+
+          // Scrolls to CJK anchor on the page
+          await browser
+            .elementByCss('#scroll-to-cjk-hash')
+            .click()
+            .waitForElementByCss('#hash-changes-page')
+
+          const scrollPosition = await browser.eval('window.pageYOffset')
+          expect(scrollPosition).toBe(17436)
+        } finally {
+          if (browser) {
+            await browser.close()
+          }
+        }
+      })
+
+      it('Should update asPath', async () => {
+        let browser
+        try {
+          browser = await webdriver(context.appPort, '/nav/hash-changes')
+
+          await browser.elementByCss('#via-link').click()
+
+          const asPath = await browser.elementByCss('div#asPath').text()
+          expect(asPath).toBe('ASPATH: /nav/hash-changes#via-link')
         } finally {
           if (browser) {
             await browser.close()
@@ -529,18 +818,51 @@ describe('Client Navigation', () => {
         await browser.close()
       })
     })
+  })
 
-    describe('when hash changed to a different hash', () => {
-      it('should not run getInitialProps', async () => {
-        const browser = await webdriver(context.appPort, '/nav/hash-changes')
+  describe('with hash changes with state', () => {
+    describe('when passing state via hash change', () => {
+      it('should increment the history state counter', async () => {
+        const browser = await webdriver(
+          context.appPort,
+          '/nav/hash-changes-with-state#'
+        )
 
-        const counter = await browser
-          .elementByCss('#via-a')
+        const historyCount = await browser
+          .elementByCss('#increment-history-count')
           .click()
-          .elementByCss('#via-link')
+          .elementByCss('#increment-history-count')
           .click()
-          .elementByCss('p')
+          .elementByCss('div#history-count')
           .text()
+
+        expect(historyCount).toBe('HISTORY COUNT: 2')
+
+        const counter = await browser.elementByCss('p').text()
+
+        // getInitialProps should not be called with only hash changes
+        expect(counter).toBe('COUNT: 0')
+
+        await browser.close()
+      })
+
+      it('should increment the shallow history state counter', async () => {
+        const browser = await webdriver(
+          context.appPort,
+          '/nav/hash-changes-with-state#'
+        )
+
+        const historyCount = await browser
+          .elementByCss('#increment-shallow-history-count')
+          .click()
+          .elementByCss('#increment-shallow-history-count')
+          .click()
+          .elementByCss('div#shallow-history-count')
+          .text()
+
+        expect(historyCount).toBe('SHALLOW HISTORY COUNT: 2')
+
+        const counter = await browser.elementByCss('p').text()
 
         expect(counter).toBe('COUNT: 0')
 
@@ -580,10 +902,7 @@ describe('Client Navigation', () => {
         .text()
       expect(counter).toBe('Counter: 2')
 
-      counter = await browser
-        .back()
-        .elementByCss('#counter')
-        .text()
+      counter = await browser.back().elementByCss('#counter').text()
       expect(counter).toBe('Counter: 1')
 
       const getInitialPropsRunCount = await browser
@@ -618,6 +937,57 @@ describe('Client Navigation', () => {
 
       await browser.close()
     })
+
+    it('should keep the scroll position on shallow routing', async () => {
+      const browser = await webdriver(context.appPort, '/nav/shallow-routing')
+      await browser.eval(() =>
+        document.querySelector('#increase').scrollIntoView()
+      )
+      const scrollPosition = await browser.eval('window.pageYOffset')
+
+      expect(scrollPosition).toBeGreaterThan(3000)
+
+      await browser.elementByCss('#increase').click()
+      await waitFor(500)
+      const newScrollPosition = await browser.eval('window.pageYOffset')
+
+      expect(newScrollPosition).toBe(scrollPosition)
+
+      await browser.elementByCss('#increase2').click()
+      await waitFor(500)
+      const newScrollPosition2 = await browser.eval('window.pageYOffset')
+
+      expect(newScrollPosition2).toBe(0)
+
+      await browser.eval(() =>
+        document.querySelector('#invalidShallow').scrollIntoView()
+      )
+      const scrollPositionDown = await browser.eval('window.pageYOffset')
+
+      expect(scrollPositionDown).toBeGreaterThan(3000)
+
+      await browser.elementByCss('#invalidShallow').click()
+      await waitFor(500)
+      const newScrollPosition3 = await browser.eval('window.pageYOffset')
+
+      expect(newScrollPosition3).toBe(0)
+    })
+  })
+
+  it('should scroll to top when the scroll option is set to true', async () => {
+    const browser = await webdriver(context.appPort, '/nav/shallow-routing')
+    await browser.eval(() =>
+      document.querySelector('#increaseWithScroll').scrollIntoView()
+    )
+    const scrollPosition = await browser.eval('window.pageYOffset')
+
+    expect(scrollPosition).toBeGreaterThan(3000)
+
+    await browser.elementByCss('#increaseWithScroll').click()
+    await check(async () => {
+      const newScrollPosition = await browser.eval('window.pageYOffset')
+      return newScrollPosition === 0 ? 'success' : 'fail'
+    }, 'success')
   })
 
   describe('with URL objects', () => {
@@ -686,6 +1056,61 @@ describe('Client Navigation', () => {
 
       await browser.close()
     })
+
+    it('should handle undefined in router.push', async () => {
+      const browser = await webdriver(context.appPort, '/nav/query-params')
+      await browser.elementByCss('#click-me').click()
+      const query = JSON.parse(
+        await browser.waitForElementByCss('#query-value').text()
+      )
+      expect(query).toEqual({
+        param1: '',
+        param2: '',
+        param3: '',
+        param4: '0',
+        param5: 'false',
+        param7: '',
+        param8: '',
+        param9: '',
+        param10: '',
+        param11: ['', '', '', '0', 'false', '', '', '', '', ''],
+      })
+    })
+  })
+
+  describe('with querystring relative urls', () => {
+    it('should work with Link', async () => {
+      const browser = await webdriver(context.appPort, '/nav/query-only')
+      try {
+        await browser.elementByCss('#link').click()
+
+        await check(() => browser.waitForElementByCss('#prop').text(), 'foo')
+      } finally {
+        await browser.close()
+      }
+    })
+
+    it('should work with router.push', async () => {
+      const browser = await webdriver(context.appPort, '/nav/query-only')
+      try {
+        await browser.elementByCss('#router-push').click()
+
+        await check(() => browser.waitForElementByCss('#prop').text(), 'bar')
+      } finally {
+        await browser.close()
+      }
+    })
+
+    it('should work with router.replace', async () => {
+      const browser = await webdriver(context.appPort, '/nav/query-only')
+      try {
+        await browser.elementByCss('#router-replace').click()
+
+        await check(() => browser.waitForElementByCss('#prop').text(), 'baz')
+      } finally {
+        await browser.close()
+      }
+    })
   })
 
   describe('with getInitialProp redirect', () => {
@@ -731,11 +1156,12 @@ describe('Client Navigation', () => {
       await browser.close()
     })
 
-    it('should work with /index page', async () => {
+    it('should not work with /index page', async () => {
       const browser = await webdriver(context.appPort, '/index')
-      const text = await browser.elementByCss('p').text()
-
-      expect(text).toBe('ComponentDidMount executed on client.')
+      expect(await browser.elementByCss('h1').text()).toBe('404')
+      expect(await browser.elementByCss('h2').text()).toBe(
+        'This page could not be found.'
+      )
       await browser.close()
     })
 
@@ -811,6 +1237,60 @@ describe('Client Navigation', () => {
 
         expect(asPath).toBe('/nav/as-path-using-router')
         await browser.close()
+      })
+
+      it('should navigate an absolute url on push', async () => {
+        const browser = await webdriver(
+          context.appPort,
+          `/absolute-url?port=${context.appPort}`
+        )
+        await browser.waitForElementByCss('#router-push').click()
+        await check(
+          () => browser.eval(() => window.location.origin),
+          'https://vercel.com'
+        )
+      })
+
+      it('should navigate an absolute url on replace', async () => {
+        const browser = await webdriver(
+          context.appPort,
+          `/absolute-url?port=${context.appPort}`
+        )
+        await browser.waitForElementByCss('#router-replace').click()
+        await check(
+          () => browser.eval(() => window.location.origin),
+          'https://vercel.com'
+        )
+      })
+
+      it('should navigate an absolute local url on push', async () => {
+        const browser = await webdriver(
+          context.appPort,
+          `/absolute-url?port=${context.appPort}`
+        )
+        await browser.eval(() => (window._didNotNavigate = true))
+        await browser.waitForElementByCss('#router-local-push').click()
+        const text = await browser
+          .waitForElementByCss('.nav-about')
+          .elementByCss('p')
+          .text()
+        expect(text).toBe('This is the about page.')
+        expect(await browser.eval(() => window._didNotNavigate)).toBe(true)
+      })
+
+      it('should navigate an absolute local url on replace', async () => {
+        const browser = await webdriver(
+          context.appPort,
+          `/absolute-url?port=${context.appPort}`
+        )
+        await browser.eval(() => (window._didNotNavigate = true))
+        await browser.waitForElementByCss('#router-local-replace').click()
+        const text = await browser
+          .waitForElementByCss('.nav-about')
+          .elementByCss('p')
+          .text()
+        expect(text).toBe('This is the about page.')
+        expect(await browser.eval(() => window._didNotNavigate)).toBe(true)
       })
     })
 
@@ -890,14 +1370,14 @@ describe('Client Navigation', () => {
   })
 
   describe('runtime errors', () => {
-    it('should show react-error-overlay when a client side error is thrown inside a component', async () => {
+    it('should show redbox when a client side error is thrown inside a component', async () => {
       let browser
       try {
         browser = await webdriver(context.appPort, '/error-inside-browser-page')
-        await waitFor(3000)
-        const text = await getReactErrorOverlayContent(browser)
+        expect(await hasRedbox(browser, true)).toBe(true)
+        const text = await getRedboxSource(browser)
         expect(text).toMatch(/An Expected error occurred/)
-        expect(text).toMatch(/pages\/error-inside-browser-page\.js:5/)
+        expect(text).toMatch(/pages[\\/]error-inside-browser-page\.js \(5:12\)/)
       } finally {
         if (browser) {
           await browser.close()
@@ -905,17 +1385,17 @@ describe('Client Navigation', () => {
       }
     })
 
-    it('should show react-error-overlay when a client side error is thrown outside a component', async () => {
+    it('should show redbox when a client side error is thrown outside a component', async () => {
       let browser
       try {
         browser = await webdriver(
           context.appPort,
           '/error-in-the-browser-global-scope'
         )
-        await waitFor(3000)
-        const text = await getReactErrorOverlayContent(browser)
+        expect(await hasRedbox(browser, true)).toBe(true)
+        const text = await getRedboxSource(browser)
         expect(text).toMatch(/An Expected error occurred/)
-        expect(text).toMatch(/error-in-the-browser-global-scope\.js:2/)
+        expect(text).toMatch(/error-in-the-browser-global-scope\.js \(2:8\)/)
       } finally {
         if (browser) {
           await browser.close()
@@ -934,12 +1414,40 @@ describe('Client Navigation', () => {
       await browser.close()
     })
 
-    it('should 404 for <page>/', async () => {
-      const browser = await webdriver(context.appPort, '/nav/about/')
+    it('should 404 on wrong casing', async () => {
+      const browser = await webdriver(context.appPort, '/nAv/AbOuT')
       expect(await browser.elementByCss('h1').text()).toBe('404')
       expect(await browser.elementByCss('h2').text()).toBe(
         'This page could not be found.'
       )
+      await browser.close()
+    })
+
+    it('should get url dynamic param', async () => {
+      const browser = await webdriver(
+        context.appPort,
+        '/dynamic/dynamic-part/route'
+      )
+      expect(await browser.elementByCss('p').text()).toBe('dynamic-part')
+      await browser.close()
+    })
+
+    it('should 404 on wrong casing of url dynamic param', async () => {
+      const browser = await webdriver(
+        context.appPort,
+        '/dynamic/dynamic-part/RoUtE'
+      )
+      expect(await browser.elementByCss('h1').text()).toBe('404')
+      expect(await browser.elementByCss('h2').text()).toBe(
+        'This page could not be found.'
+      )
+      await browser.close()
+    })
+
+    it('should not 404 for <page>/', async () => {
+      const browser = await webdriver(context.appPort, '/nav/about/')
+      const text = await browser.elementByCss('p').text()
+      expect(text).toBe('This is the about page.')
       await browser.close()
     })
 
@@ -955,6 +1463,102 @@ describe('Client Navigation', () => {
   })
 
   describe('updating head while client routing', () => {
+    it('should only execute async and defer scripts once', async () => {
+      let browser
+      try {
+        browser = await webdriver(context.appPort, '/head')
+
+        await browser.waitForElementByCss('h1')
+        await waitFor(2000)
+        expect(
+          Number(await browser.eval('window.__test_async_executions'))
+        ).toBe(1)
+        expect(
+          Number(await browser.eval('window.__test_defer_executions'))
+        ).toBe(1)
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+
+    it('should warn when stylesheets or scripts are in head', async () => {
+      let browser
+      try {
+        browser = await webdriver(context.appPort, '/head')
+
+        await browser.waitForElementByCss('h1')
+        await waitFor(1000)
+        const browserLogs = await browser.log('browser')
+        let foundStyles = false
+        let foundScripts = false
+        const logs = []
+        browserLogs.forEach(({ message }) => {
+          if (message.includes('Do not add stylesheets using next/head')) {
+            foundStyles = true
+            logs.push(message)
+          }
+          if (message.includes('Do not add <script> tags using next/head')) {
+            foundScripts = true
+            logs.push(message)
+          }
+        })
+
+        expect(foundStyles).toEqual(true)
+        expect(foundScripts).toEqual(true)
+
+        // Warnings are unique
+        expect(logs.length).toEqual(new Set(logs).size)
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+
+    it('should warn when scripts are in head', async () => {
+      let browser
+      try {
+        browser = await webdriver(context.appPort, '/head')
+        await browser.waitForElementByCss('h1')
+        await waitFor(1000)
+        const browserLogs = await browser.log('browser')
+        let found = false
+        browserLogs.forEach((log) => {
+          if (log.message.includes('Use next/script instead')) {
+            found = true
+          }
+        })
+        expect(found).toEqual(true)
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+
+    it('should not warn when application/ld+json scripts are in head', async () => {
+      let browser
+      try {
+        browser = await webdriver(context.appPort, '/head-with-json-ld-snippet')
+        await browser.waitForElementByCss('h1')
+        await waitFor(1000)
+        const browserLogs = await browser.log('browser')
+        let found = false
+        browserLogs.forEach((log) => {
+          if (log.message.includes('Use next/script instead')) {
+            found = true
+          }
+        })
+        expect(found).toEqual(false)
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+
     it('should update head during client routing', async () => {
       let browser
       try {
@@ -974,6 +1578,27 @@ describe('Client Navigation', () => {
             .elementByCss('meta[name="description"]')
             .getAttribute('content')
         ).toBe('Head Two')
+
+        await browser
+          .elementByCss('#to-head-1')
+          .click()
+          .waitForElementByCss('#head-1', 3000)
+        expect(
+          await browser
+            .elementByCss('meta[name="description"]')
+            .getAttribute('content')
+        ).toBe('Head One')
+
+        await browser
+          .elementByCss('#to-head-3')
+          .click()
+          .waitForElementByCss('#head-3', 3000)
+        expect(
+          await browser
+            .elementByCss('meta[name="description"]')
+            .getAttribute('content')
+        ).toBe('Head Three')
+        expect(await browser.eval('document.title')).toBe('')
 
         await browser
           .elementByCss('#to-head-1')
@@ -1014,6 +1639,82 @@ describe('Client Navigation', () => {
         }
       }
     })
+
+    it('should update head when unmounting component', async () => {
+      let browser
+      try {
+        browser = await webdriver(context.appPort, '/head-dynamic')
+        expect(await browser.eval('document.title')).toBe('B')
+        await browser.elementByCss('button').click()
+        expect(await browser.eval('document.title')).toBe('A')
+        await browser.elementByCss('button').click()
+        expect(await browser.eval('document.title')).toBe('B')
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+  })
+
+  describe('foreign history manipulation', () => {
+    it('should ignore history state without options', async () => {
+      let browser
+      try {
+        browser = await webdriver(context.appPort, '/nav')
+        // push history object without options
+        await browser.eval(
+          'window.history.pushState({ url: "/whatever" }, "", "/whatever")'
+        )
+        await browser.elementByCss('#about-link').click()
+        await browser.waitForElementByCss('.nav-about')
+        await browser.back()
+        await waitFor(1000)
+        expect(await hasRedbox(browser, false)).toBe(false)
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+
+    it('should ignore history state with an invalid url', async () => {
+      let browser
+      try {
+        browser = await webdriver(context.appPort, '/nav')
+        // push history object wit invalid url (not relative)
+        await browser.eval(
+          'window.history.pushState({ url: "http://google.com" }, "", "/whatever")'
+        )
+        await browser.elementByCss('#about-link').click()
+        await browser.waitForElementByCss('.nav-about')
+        await browser.back()
+        await waitFor(1000)
+        expect(await hasRedbox(browser, false)).toBe(false)
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
+
+    it('should ignore foreign history state with missing properties', async () => {
+      let browser
+      try {
+        browser = await webdriver(context.appPort, '/nav')
+        // push empty history state
+        await browser.eval('window.history.pushState({}, "", "/whatever")')
+        await browser.elementByCss('#about-link').click()
+        await browser.waitForElementByCss('.nav-about')
+        await browser.back()
+        await waitFor(1000)
+        expect(await hasRedbox(browser, false)).toBe(false)
+      } finally {
+        if (browser) {
+          await browser.close()
+        }
+      }
+    })
   })
 
   it('should not error on module.exports + polyfills', async () => {
@@ -1038,8 +1739,61 @@ describe('Client Navigation', () => {
     await browser.close()
   })
 
+  it('should handle undefined prop in head client-side', async () => {
+    const browser = await webdriver(context.appPort, '/head')
+    const value = await browser.eval(
+      `document.querySelector('meta[name="empty-content"]').hasAttribute('content')`
+    )
+
+    expect(value).toBe(false)
+  })
+
+  it('should emit routeChangeError on hash change cancel', async () => {
+    const browser = await webdriver(context.appPort, '/')
+
+    await browser.eval(`(function() {
+      window.routeErrors = []
+
+      window.next.router.events.on('routeChangeError', function (err) {
+        window.routeErrors.push(err)
+      })
+      window.next.router.push('#first')
+      window.next.router.push('#second')
+      window.next.router.push('#third')
+    })()`)
+
+    await check(async () => {
+      const errorCount = await browser.eval('window.routeErrors.length')
+      return errorCount > 0 ? 'success' : errorCount
+    }, 'success')
+  })
+
+  it('should navigate to paths relative to the current page', async () => {
+    const browser = await webdriver(context.appPort, '/nav/relative')
+    let page
+
+    await browser.elementByCss('a').click()
+
+    browser.waitForElementByCss('#relative-1')
+    page = await browser.elementByCss('body').text()
+    expect(page).toMatch(/On relative 1/)
+    await browser.elementByCss('a').click()
+
+    browser.waitForElementByCss('#relative-2')
+    page = await browser.elementByCss('body').text()
+    expect(page).toMatch(/On relative 2/)
+
+    await browser.elementByCss('button').click()
+    browser.waitForElementByCss('#relative')
+    page = await browser.elementByCss('body').text()
+    expect(page).toMatch(/On relative index/)
+
+    await browser.close()
+  })
+
   renderingSuite(
     (p, q) => renderViaHTTP(context.appPort, p, q),
-    (p, q) => fetchViaHTTP(context.appPort, p, q)
+    (p, q) => fetchViaHTTP(context.appPort, p, q),
+    context
   )
 })

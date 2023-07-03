@@ -1,6 +1,5 @@
 {
-  "name": "with-next-seo",
-  "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "next",
     "build": "next build",
@@ -9,8 +8,7 @@
   "dependencies": {
     "next": "latest",
     "next-seo": "latest",
-    "react": "^16.7.0",
-    "react-dom": "^16.7.0"
-  },
-  "license": "ISC"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
 }

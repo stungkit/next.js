@@ -1,6 +1,5 @@
 {
-  "name": "with-aphrodite",
-  "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "next",
     "build": "next build",
@@ -9,9 +8,7 @@
   "dependencies": {
     "aphrodite": "^2.3.1",
     "next": "latest",
-    "react": "^16.7.0",
-    "react-dom": "^16.7.0"
-  },
-  "author": "",
-  "license": "ISC"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
 }

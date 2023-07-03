@@ -1,20 +1,25 @@
 {
-  "name": "with-webpack-bundle-analyzer",
-  "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "next",
     "build": "next build",
     "start": "next start",
-    "analyze": "BUNDLE_ANALYZE=both next build",
-    "analyze:server": "BUNDLE_ANALYZE=server next build",
-    "analyze:browser": "BUNDLE_ANALYZE=browser next build"
+    "analyze": "cross-env ANALYZE=true yarn build",
+    "serve": "serve .next/analyze"
   },
   "dependencies": {
-    "@zeit/next-bundle-analyzer": "^0.1.2",
-    "faker": "^4.1.0",
+    "@faker-js/faker": "^7.3.0",
+    "@next/bundle-analyzer": "^12.1.6",
+    "cross-env": "^7.0.3",
     "next": "latest",
-    "react": "^16.7.0",
-    "react-dom": "^16.7.0"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
-  "license": "ISC"
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/react": "^18.0.14",
+    "@types/react-dom": "^18.0.5",
+    "serve": "^13.0.2",
+    "typescript": "^4.7.4"
+  }
 }

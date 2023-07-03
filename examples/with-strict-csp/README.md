@@ -1,44 +1,30 @@
-# Strict CSP example
+# Example app with strict CSP generating script hash
+
+This example features how you can set up a strict CSP for your pages including Next.js' inline bootstrap script by hash.
+It defines the CSP by document `meta` tag.
+
+Note: There are still valid cases for using a nonce in case you need to inline scripts or styles for which calculating a hash is not feasible.
+
+## Deploy your own
+
+Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=next-example) or preview live with [StackBlitz](https://stackblitz.com/github/vercel/next.js/tree/canary/examples/with-strict-csp)
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel/next.js/tree/canary/examples/with-strict-csp&project-name=with-strict-csp&repository-name=with-strict-csp)
 
 ## How to use
 
-### Using `create-next-app`
-
-Execute [`create-next-app`](https://github.com/zeit/next.js/tree/canary/packages/create-next-app) with [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/) or [npx](https://github.com/zkat/npx#readme) to bootstrap the example:
+Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [npm](https://docs.npmjs.com/cli/init), [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/), or [pnpm](https://pnpm.io) to bootstrap the example:
 
 ```bash
 npx create-next-app --example with-strict-csp with-strict-csp-app
-# or
+```
+
+```bash
 yarn create next-app --example with-strict-csp with-strict-csp-app
 ```
 
-### Download manually
-
-Download the example:
-
 ```bash
-curl https://codeload.github.com/zeit/next.js/tar.gz/canary | tar -xz --strip=2 next.js-canary/examples/with-strict-csp
-cd with-strict-csp
+pnpm create next-app --example with-strict-csp with-strict-csp-app
 ```
 
-Install it and run:
-
-```bash
-npm install
-npm run dev
-# or
-yarn
-yarn dev
-```
-
-Deploy it to the cloud with [now](https://zeit.co/now) ([download](https://zeit.co/download))
-
-```bash
-now
-```
-
-## The idea behind the example
-
-If you want to implement a CSP, the most effective way is to follow the [strict CSP](https://csp.withgoogle.com/docs/strict-csp.html) approach. For it to work, we need to generate a nonce on every request.
-
-This example uses [Helmet](https://github.com/helmetjs/helmet) to configure the CSP and add the appropriate headers to all server responses. The nonce is generated with [uuid](https://github.com/kelektiv/node-uuid). Then we can pass the nonce to `<Head>` and `<NextScript>` in the custom `<Document>`.
+Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=next-example) ([Documentation](https://nextjs.org/docs/deployment)).

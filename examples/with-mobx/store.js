@@ -1,32 +1,46 @@
-import { action, observable } from 'mobx'
-import { useStaticRendering } from 'mobx-react'
+import { action, observable, computed, runInAction, makeObservable } from 'mobx'
+import { enableStaticRendering } from 'mobx-react-lite'
 
-const isServer = typeof window === 'undefined'
-useStaticRendering(isServer)
+enableStaticRendering(typeof window === 'undefined')
 
 export class Store {
-  @observable lastUpdate = 0
-  @observable light = false
+  lastUpdate = 0
+  light = false
 
-  hydrate(serializedStore) {
-    this.lastUpdate =
-      serializedStore.lastUpdate != null
-        ? serializedStore.lastUpdate
-        : Date.now()
-    this.light = !!serializedStore.light
+  constructor() {
+    makeObservable(this, {
+      lastUpdate: observable,
+      light: observable,
+      start: action,
+      hydrate: action,
+      timeString: computed,
+    })
   }
 
-  @action start = () => {
+  start = () => {
     this.timer = setInterval(() => {
-      this.lastUpdate = Date.now()
-      this.light = true
+      runInAction(() => {
+        this.lastUpdate = Date.now()
+        this.light = true
+      })
     }, 1000)
   }
 
-  stop = () => clearInterval(this.timer)
-}
+  get timeString() {
+    const pad = (n) => (n < 10 ? `0${n}` : n)
+    const format = (t) =>
+      `${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:${pad(
+        t.getUTCSeconds()
+      )}`
+    return format(new Date(this.lastUpdate))
+  }
 
-export async function fetchInitialStoreState() {
-  // You can do anything to fetch initial store state
-  return {}
+  stop = () => clearInterval(this.timer)
+
+  hydrate = (data) => {
+    if (!data) return
+
+    this.lastUpdate = data.lastUpdate !== null ? data.lastUpdate : Date.now()
+    this.light = !!data.light
+  }
 }

@@ -6,54 +6,33 @@ global state object can be used to track state across page within the applicatio
 It is intended to show how to build a simple, stateful application using hooks
 without the added complexity of a redux type library.
 
+This example features:
+
+- An app that mixes together JavaScript and ReasonML components and functions
+- An app with two pages which has a common Counter component
+- That Counter component maintain the counter inside its module. This is used
+  primarily to illustrate that modules get initialized once and their state
+  variables persist in runtime
+
+## Deploy your own
+
+Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=next-example):
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel/next.js/tree/canary/examples/with-reasonml-todo&project-name=with-reasonml-todo&repository-name=with-reasonml-todo)
+
 ## How to use
 
-### Using `create-next-app`
-
-Execute [`create-next-app`](https://github.com/zeit/next.js/tree/canary/packages/create-next-app) with
-[Yarn](https://yarnpkg.com/lang/en/docs/cli/create/) or
-[npx](https://github.com/zkat/npx#readme) to bootstrap the example:
+Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [npm](https://docs.npmjs.com/cli/init), [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/), or [pnpm](https://pnpm.io) to bootstrap the example:
 
 ```bash
 npx create-next-app --example with-reasonml-todo with-reasonml-app
 # or
 yarn create next-app --example with-reasonml-todo with-reasonml-app
-```
-
-### Download manually
-
-Download the example:
-
-```bash
-curl https://codeload.github.com/zeit/next.js/tar.gz/canary | tar -xz --strip=2 next.js-canary/examples/with-reasonml-todo
-cd with-reasonml-todo
-```
-
-Install it and run:
-
-```bash
-npm install
-npm run dev
 # or
-yarn
-yarn dev
+pnpm create next-app --example with-reasonml-todo with-reasonml-app
 ```
 
-Build and run:
-
-```bash
-npm run build
-npm run start
-# or
-yarn build
-yarn start
-```
-
-Deploy it to the cloud with [now](https://zeit.co/now) ([download](https://zeit.co/download))
-
-```bash
-now
-```
+Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=next-example) ([Documentation](https://nextjs.org/docs/deployment)).
 
 ### Recommendation:
 
@@ -73,13 +52,3 @@ There are 2 convenience scripts to facilitate running these separate processes:
    script. This will also hot reload as you make changes.
 
 You should start the scripts in the presented order.
-
-## The idea behind the example
-
-This example features:
-
-- An app that mixes together JavaScript and ReasonML components and functions
-- An app with two pages which has a common Counter component
-- That Counter component maintain the counter inside its module. This is used
-  primarily to illustrate that modules get initialized once and their state
-  variables persist in runtime
