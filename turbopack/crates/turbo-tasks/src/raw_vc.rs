@@ -8,10 +8,9 @@ use thiserror::Error;
 use crate::{
     backend::{CellContent, TypedCellContent},
     event::EventListener,
-    id::{ExecutionId, LocalCellId, LocalTaskId},
+    id::LocalTaskId,
     manager::{
-        assert_execution_id, current_task, read_local_cell, read_local_output, read_task_cell,
-        read_task_output, with_turbo_tasks, TurboTasksApi,
+        read_local_output, read_task_cell, read_task_output, with_turbo_tasks, TurboTasksApi,
     },
     registry::{self, get_value_type},
     turbo_tasks, CollectiblesSource, ReadConsistency, TaskId, TraitTypeId, ValueType, ValueTypeId,
@@ -61,8 +60,6 @@ pub enum RawVc {
     TaskOutput(TaskId),
     TaskCell(TaskId, CellId),
     LocalOutput(TaskId, LocalTaskId),
-    #[serde(skip)]
-    LocalCell(ExecutionId, LocalCellId),
 }
 
 impl RawVc {
@@ -71,7 +68,6 @@ impl RawVc {
             RawVc::TaskOutput(_) => false,
             RawVc::TaskCell(_, _) => true,
             RawVc::LocalOutput(_, _) => false,
-            RawVc::LocalCell(_, _) => false,
         }
     }
 
@@ -80,7 +76,6 @@ impl RawVc {
             RawVc::TaskOutput(_) => false,
             RawVc::TaskCell(_, _) => false,
             RawVc::LocalOutput(_, _) => true,
-            RawVc::LocalCell(_, _) => true,
         }
     }
 
@@ -89,8 +84,6 @@ impl RawVc {
             RawVc::TaskOutput(task) | RawVc::TaskCell(task, _) | RawVc::LocalOutput(task, _) => {
                 task.is_transient()
             }
-            // TODO track the transient flag in the highest bit of the execution id
-            RawVc::LocalCell(_, _) => todo!(),
         }
     }
 
@@ -177,24 +170,10 @@ impl RawVc {
                         return Err(ResolveTypeError::NoContent);
                     }
                 }
-                RawVc::LocalOutput(task_id, local_cell_id) => {
-                    current =
-                        read_local_output(&*tt, task_id, local_cell_id, ReadConsistency::Eventual)
-                            .await
-                            .map_err(|source| ResolveTypeError::TaskError { source })?;
-                }
-                RawVc::LocalCell(execution_id, local_cell_id) => {
-                    let shared_reference = read_local_cell(execution_id, local_cell_id);
-                    return Ok(
-                        if let (true, value_type) = conditional(shared_reference.0) {
-                            // re-use the `ValueType` lookup from `conditional`, if it exists
-                            let value_type =
-                                value_type.unwrap_or_else(|| get_value_type(shared_reference.0));
-                            Some((value_type.raw_cell)(shared_reference))
-                        } else {
-                            None
-                        },
-                    );
+                RawVc::LocalOutput(task_id, local_task_id) => {
+                    current = read_local_output(&*tt, task_id, local_task_id)
+                        .await
+                        .map_err(|source| ResolveTypeError::TaskError { source })?;
                 }
             }
         }
@@ -210,31 +189,27 @@ impl RawVc {
         self.resolve_inner(ReadConsistency::Strong).await
     }
 
-    async fn resolve_inner(self, consistency: ReadConsistency) -> Result<RawVc> {
+    async fn resolve_inner(self, mut consistency: ReadConsistency) -> Result<RawVc> {
         let tt = turbo_tasks();
         let mut current = self;
         let mut notified = false;
-        let mut lazily_notify = || {
-            if !notified {
-                tt.notify_scheduled_tasks();
-                notified = true;
-            }
-        };
         loop {
             match current {
                 RawVc::TaskOutput(task) => {
-                    lazily_notify();
+                    if !notified {
+                        tt.notify_scheduled_tasks();
+                        notified = true;
+                    }
                     current = read_task_output(&*tt, task, consistency).await?;
+                    // We no longer need to read strongly consistent, as any Vc returned
+                    // from the first task will be inside of the scope of the first
+                    // task. So it's already strongly consistent.
+                    consistency = ReadConsistency::Eventual;
                 }
                 RawVc::TaskCell(_, _) => return Ok(current),
-                RawVc::LocalOutput(task_id, local_cell_id) => {
-                    lazily_notify();
-                    current = read_local_output(&*tt, task_id, local_cell_id, consistency).await?;
-                }
-                RawVc::LocalCell(execution_id, local_cell_id) => {
-                    let shared_reference = read_local_cell(execution_id, local_cell_id);
-                    let value_type = get_value_type(shared_reference.0);
-                    return Ok((value_type.raw_cell)(shared_reference));
+                RawVc::LocalOutput(task_id, local_task_id) => {
+                    debug_assert_eq!(consistency, ReadConsistency::Eventual);
+                    current = read_local_output(&*tt, task_id, local_task_id).await?;
                 }
             }
         }
@@ -245,25 +220,10 @@ impl RawVc {
     pub(crate) async fn to_non_local(self) -> Result<RawVc> {
         let tt = turbo_tasks();
         let mut current = self;
-        let mut notified = false;
-        let mut lazily_notify = || {
-            if !notified {
-                tt.notify_scheduled_tasks();
-                notified = true;
-            }
-        };
         loop {
             match current {
-                RawVc::LocalOutput(task_id, local_cell_id) => {
-                    lazily_notify();
-                    current =
-                        read_local_output(&*tt, task_id, local_cell_id, ReadConsistency::Eventual)
-                            .await?;
-                }
-                RawVc::LocalCell(execution_id, local_cell_id) => {
-                    let shared_reference = read_local_cell(execution_id, local_cell_id);
-                    let value_type = get_value_type(shared_reference.0);
-                    return Ok((value_type.raw_cell)(shared_reference));
+                RawVc::LocalOutput(task_id, local_task_id) => {
+                    current = read_local_output(&*tt, task_id, local_task_id).await?;
                 }
                 non_local => return Ok(non_local),
             }
@@ -278,10 +238,6 @@ impl RawVc {
     pub fn get_task_id(&self) -> TaskId {
         match self {
             RawVc::TaskOutput(t) | RawVc::TaskCell(t, _) | RawVc::LocalOutput(t, _) => *t,
-            RawVc::LocalCell(execution_id, _) => {
-                assert_execution_id(*execution_id);
-                current_task("RawVc::get_task_id")
-            }
         }
     }
 
@@ -409,8 +365,7 @@ impl Future for ReadRawVcFuture {
                             Ok(Ok(vc)) => {
                                 // We no longer need to read strongly consistent, as any Vc returned
                                 // from the first task will be inside of the scope of the first
-                                // task. So it's already strongly
-                                // consistent.
+                                // task. So it's already strongly consistent.
                                 this.consistency = ReadConsistency::Eventual;
                                 this.current = vc;
                                 continue 'outer;
@@ -435,29 +390,16 @@ impl Future for ReadRawVcFuture {
                         }
                     }
                     RawVc::LocalOutput(task_id, local_output_id) => {
-                        let read_result = if this.untracked {
-                            tt.try_read_local_output_untracked(
-                                task_id,
-                                local_output_id,
-                                this.consistency,
-                            )
-                        } else {
-                            tt.try_read_local_output(task_id, local_output_id, this.consistency)
-                        };
+                        debug_assert_eq!(this.consistency, ReadConsistency::Eventual);
+                        let read_result = tt.try_read_local_output(task_id, local_output_id);
                         match read_result {
                             Ok(Ok(vc)) => {
-                                this.consistency = ReadConsistency::Eventual;
                                 this.current = vc;
                                 continue 'outer;
                             }
                             Ok(Err(listener)) => listener,
                             Err(err) => return Poll::Ready(Err(err)),
                         }
-                    }
-                    RawVc::LocalCell(execution_id, local_cell_id) => {
-                        return Poll::Ready(
-                            Ok(read_local_cell(execution_id, local_cell_id).into()),
-                        );
                     }
                 };
                 // SAFETY: listener is from previous pinned this

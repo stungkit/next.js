@@ -14,7 +14,7 @@ use swc_core::{
             text_writer::{self, JsWriter, WriteJs},
             Emitter,
         },
-        minifier::option::{ExtraOptions, MangleOptions, MinifyOptions},
+        minifier::option::{CompressOptions, ExtraOptions, MangleOptions, MinifyOptions},
         parser::{lexer::Lexer, Parser, StringInput, Syntax},
         transforms::base::fixer::paren_remover,
     },
@@ -39,7 +39,7 @@ pub async fn minify(
     let code = code.await?;
 
     let cm = Arc::new(SwcSourceMap::new(FilePathMapping::empty()));
-    let (src, src_map_buf) = {
+    let (src, mut src_map_buf) = {
         let compiler = Arc::new(Compiler::new(cm.clone()));
         let fm = compiler.cm.new_source_file(
             FileName::Custom(path.path.to_string()).into(),
@@ -85,7 +85,12 @@ pub async fn minify(
                         Some(&comments),
                         None,
                         &MinifyOptions {
-                            compress: Some(Default::default()),
+                            compress: Some(CompressOptions {
+                                // Only run 2 passes, this is a tradeoff between performance and
+                                // compression size. Default is 3 passes.
+                                passes: 2,
+                                ..Default::default()
+                            }),
                             mangle: Some(MangleOptions {
                                 reserved: vec!["AbortSignal".into()],
                                 ..Default::default()
@@ -95,7 +100,7 @@ pub async fn minify(
                         &ExtraOptions {
                             top_level_mark,
                             unresolved_mark,
-                            mangle_name_cache: Default::default(),
+                            mangle_name_cache: None,
                         },
                     );
 
@@ -111,6 +116,7 @@ pub async fn minify(
 
     let mut builder = CodeBuilder::default();
     if let Some(original_map) = source_maps {
+        src_map_buf.shrink_to_fit();
         builder.push_source(
             &src.into(),
             Some(ResolvedVc::upcast(
@@ -162,7 +168,8 @@ fn print_program(
                 .context("failed to emit module")?;
         }
         // Invalid utf8 is valid in javascript world.
-        String::from_utf8(buf).expect("invalid utf8 character detected")
+        // SAFETY: SWC generates valid utf8.
+        unsafe { String::from_utf8_unchecked(buf) }
     };
 
     Ok((src, src_map_buf))

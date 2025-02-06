@@ -1,6 +1,9 @@
 import type { CacheNodeSeedData, PreloadCallbacks } from './types'
 import React from 'react'
-import { isClientReference } from '../../lib/client-reference'
+import {
+  isClientReference,
+  isUseCacheFunction,
+} from '../../lib/client-and-server-references'
 import { getLayoutOrPageModule } from '../lib/app-dir-module'
 import type { LoaderTree } from '../lib/app-dir-module'
 import { interopDefault } from './interop-default'
@@ -19,6 +22,7 @@ import type { Params } from '../request/params'
 import { workUnitAsyncStorage } from './work-unit-async-storage.external'
 import { OUTLET_BOUNDARY_NAME } from '../../lib/metadata/metadata-constants'
 import { DEFAULT_SEGMENT_KEY } from '../../shared/lib/segment'
+import type { UseCachePageComponentProps } from '../use-cache/use-cache-wrapper'
 
 /**
  * Use the provided loader tree to create the React Component tree.
@@ -36,7 +40,7 @@ export function createComponentTree(props: {
   missingSlots?: Set<string>
   preloadCallbacks: PreloadCallbacks
   authInterrupts: boolean
-  MetadataComponent: React.ComponentType<{}>
+  StreamingMetadata: React.ComponentType<{}>
 }): Promise<CacheNodeSeedData> {
   return getTracer().trace(
     NextNodeServerSpan.createComponentTree,
@@ -72,7 +76,7 @@ async function createComponentTreeInternal({
   missingSlots,
   preloadCallbacks,
   authInterrupts,
-  MetadataComponent,
+  StreamingMetadata,
 }: {
   loaderTree: LoaderTree
   parentParams: Params
@@ -86,7 +90,7 @@ async function createComponentTreeInternal({
   missingSlots?: Set<string>
   preloadCallbacks: PreloadCallbacks
   authInterrupts: boolean
-  MetadataComponent: React.ComponentType<{}>
+  StreamingMetadata: React.ComponentType<{}>
 }): Promise<CacheNodeSeedData> {
   const {
     renderOpts: { nextConfigOutput, experimental },
@@ -395,7 +399,7 @@ async function createComponentTreeInternal({
   // Only render metadata on the actual SSR'd segment not the `default` segment,
   // as it's used as a placeholder for navigation.
   const metadata =
-    actualSegment !== DEFAULT_SEGMENT_KEY ? <MetadataComponent /> : undefined
+    actualSegment !== DEFAULT_SEGMENT_KEY ? <StreamingMetadata /> : undefined
 
   const notFoundElement = NotFound ? (
     <>
@@ -516,7 +520,7 @@ async function createComponentTreeInternal({
             missingSlots,
             preloadCallbacks,
             authInterrupts,
-            MetadataComponent,
+            StreamingMetadata,
           })
 
           childCacheNodeSeedData = seedData
@@ -652,19 +656,44 @@ async function createComponentTreeInternal({
         )
       }
     } else {
-      // If we are passing searchParams to a server component Page we need to track their usage in case
-      // the current render mode tracks dynamic API usage.
+      // If we are passing params to a server component Page we need to track
+      // their usage in case the current render mode tracks dynamic API usage.
       const params = createServerParamsForServerSegment(
         currentParams,
         workStore
       )
-      const searchParams = createServerSearchParamsForServerPage(
-        query,
-        workStore
-      )
-      pageElement = (
-        <PageComponent params={params} searchParams={searchParams} />
-      )
+
+      // TODO(useCache): Should we use this trick also if dynamicIO is enabled,
+      // instead of relying on the searchParams being a hanging promise?
+      if (!experimental.dynamicIO && isUseCacheFunction(PageComponent)) {
+        const UseCachePageComponent: React.ComponentType<UseCachePageComponentProps> =
+          PageComponent
+
+        // The "use cache" wrapper takes care of converting this into an
+        // erroring search params promise when passing it to the original
+        // function.
+        const searchParams = Promise.resolve({})
+
+        pageElement = (
+          <UseCachePageComponent
+            params={params}
+            searchParams={searchParams}
+            $$isPageComponent
+          />
+        )
+      } else {
+        // If we are passing searchParams to a server component Page we need to
+        // track their usage in case the current render mode tracks dynamic API
+        // usage.
+        const searchParams = createServerSearchParamsForServerPage(
+          query,
+          workStore
+        )
+
+        pageElement = (
+          <PageComponent params={params} searchParams={searchParams} />
+        )
+      }
     }
     return [
       actualSegment,
